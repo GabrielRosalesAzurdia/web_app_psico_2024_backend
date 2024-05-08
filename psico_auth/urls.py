@@ -6,7 +6,7 @@ from django.urls import path
 
 from rest_framework_simplejwt.views import TokenVerifyView
 
-from paws_auth.views import password_reset_redirect
+from psico_auth.views import password_reset_redirect
 
 urlpatterns = [
     path('login/', dra_views.LoginView.as_view()),

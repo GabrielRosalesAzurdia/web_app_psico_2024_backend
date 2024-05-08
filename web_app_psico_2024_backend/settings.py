@@ -48,13 +48,11 @@ INSTALLED_APPS = [
     'dj_rest_auth.registration',
     'rest_framework_simplejwt',
     'drf_spectacular',
-    'paws_auth.apps.PawsAuthConfig',
+    'psico_auth.apps.PsicoAuthConfig',
     'profiles.apps.ProfilesConfig',
 
     'allauth',
     'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.google',
 ]
 
 MIDDLEWARE = [
@@ -139,6 +137,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'web_app_psico_2024_backend', 'static')]
 
 # Media files
 MEDIA_URL = '/media/'
@@ -173,7 +172,7 @@ REST_AUTH = {
     'SESSION_LOGIN': False,
     'USE_JWT': True,
     'JWT_AUTH_HTTPONLY': False,
-    'REGISTER_SERIALIZER': 'paws_auth.serializer.UserRegisterSerializer',
+    'REGISTER_SERIALIZER': 'psico_auth.serializer.UserRegisterSerializer',
 }
 
 SIMPLE_JWT = {
@@ -188,11 +187,12 @@ ACCOUNT_AUTHENTICATION_METHOD = 'email'
 
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
 )
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Paws API',
-    'DESCRIPTION': 'The official Paws API',
+    'TITLE': 'Daniel Padnos Wellness Center API',
+    'DESCRIPTION': 'The official Daniel Padnos Wellness Center Api',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'CAMELIZE_NAMES': True,
@@ -201,3 +201,7 @@ SPECTACULAR_SETTINGS = {
         'drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields',
     ],
 }
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CORS_ALLOW_ALL_ORIGINS = True
