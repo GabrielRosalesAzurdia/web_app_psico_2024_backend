@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'psico_auth.apps.PsicoAuthConfig',
     'profiles.apps.ProfilesConfig',
+    'patient.apps.PatientConfig',
 
     'allauth',
     'allauth.account',
