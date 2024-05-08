@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/v1/', include('profiles.urls')),
     path('api/v1/auth/', include('psico_auth.urls')),
     path('api/v1/patient/', include('patient.urls')),
+    path('api/v1/appointment/', include('appointments.urls')),
 
     path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/v1/docs/',

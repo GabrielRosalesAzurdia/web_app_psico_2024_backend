@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'psico_auth.apps.PsicoAuthConfig',
     'profiles.apps.ProfilesConfig',
     'patient.apps.PatientConfig',
+    'appointments.apps.AppointmentsConfig',
 
     'allauth',
     'allauth.account',
