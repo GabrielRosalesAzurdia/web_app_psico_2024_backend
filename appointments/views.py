@@ -12,7 +12,8 @@ class AppointmentCreateApiView(ListCreateAPIView):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
     permission_classes = [IsAuthenticated]
-
+    # def get_queryset(self):
+    #     return Appointment.objects.filter(doctor=self.request.user.pk)
 
 class AppointmentRetrieveApiView(RetrieveUpdateAPIView):
     queryset = Appointment.objects.all()
