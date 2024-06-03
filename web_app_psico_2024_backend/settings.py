@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'profiles.apps.ProfilesConfig',
     'patient.apps.PatientConfig',
     'appointments.apps.AppointmentsConfig',
+    'events',
 
     'allauth',
     'allauth.account',
