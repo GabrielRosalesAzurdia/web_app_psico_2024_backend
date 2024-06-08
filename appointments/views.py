@@ -21,10 +21,10 @@ class AppointmentRetrieveApiView(RetrieveUpdateAPIView):
         return AppointmentReadSerializer
     permission_classes = [IsAuthenticated]
     
-class AppointmentGetTodaysDatesApiView(ListAPIView):
+class AppointmentGetPendingApiView(ListAPIView):
     today = now().date()
-    queryset = Appointment.objects.filter(date=today).order_by('date')
-    serializer_class = AppointmentSerializer
+    queryset = Appointment.objects.filter(date__gte=today, status="PENDING").order_by('date')
+    serializer_class = AppointmentReadSerializer
     permission_classes = [IsAuthenticated]
     # def get_queryset(self):
     #     return Appointment.objects.filter(doctor=self.request.user.pk)
