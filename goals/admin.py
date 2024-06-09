@@ -1,3 +1,12 @@
 from django.contrib import admin
 
-# Register your models here.
+from goals.models import Goal, GoalMetrics
+
+
+@admin.register(Goal)
+class GoalAdmin(admin.ModelAdmin):
+    ...
+
+@admin.register(GoalMetrics)
+class GoalMetricsAdmin(admin.ModelAdmin):
+    ...

@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     'profiles.apps.ProfilesConfig',
     'patient.apps.PatientConfig',
     'appointments.apps.AppointmentsConfig',
+    'activity.apps.ActivityConfig',
+    'goals.apps.GoalsConfig',
 
     'allauth',
     'allauth.account',
@@ -127,7 +129,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = 'America/Guatemala'
 
 USE_I18N = True
 

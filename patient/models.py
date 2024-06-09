@@ -27,3 +27,6 @@ class Patient(models.Model):
         on_delete=models.PROTECT,
         related_name='patient'
     )
+
+    def __str__(self):
+        return f'{self.name} - {self.phone} - {self.age}'

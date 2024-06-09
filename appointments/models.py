@@ -26,9 +26,19 @@ class Appointment(models.Model):
     )
     hour = models.TimeField()
     date = models.DateField()
+    goal = models.ForeignKey(
+        'goals.Goal',
+        on_delete=models.PROTECT,
+        related_name='goal',
+        blank=True,
+        null=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     status = models.CharField(
         max_length=50,
         choices=StatusType.choices,
         default=StatusType.PENDING)
+
+    def __str__(self):
+        return f'{self.date} - {self.patient} - {self.doctor}'

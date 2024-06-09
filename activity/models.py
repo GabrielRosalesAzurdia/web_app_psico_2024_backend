@@ -31,3 +31,6 @@ class Activity(models.Model):
         max_length=50,
         choices=PlaceType.choices,
         default=PlaceType.CDO)
+
+    def __str__(self):
+        return f'{self.date} - {self.place}'
