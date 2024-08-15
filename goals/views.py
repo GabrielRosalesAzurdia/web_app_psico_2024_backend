@@ -30,7 +30,7 @@ class GoalMetricsApiView(ListAPIView):
         try:
             set_goal = Goal.objects.get(start_time__lte = now().date(), end_time__gte = now().date())
             goal_appointments = Appointment.objects.filter(goal=set_goal.pk)
-            goal_metric = GoalMetrics(appointments = goal_appointments.count(), monthly_goal_porcentage = goal_appointments.count()/set_goal.apponitmentsGoal, assistance =goal_appointments.filter(status="DONE").count())
+            goal_metric = GoalMetrics(appointments = goal_appointments.count(), monthly_goal_porcentage = goal_appointments.count()/set_goal.apponitments_goal, assistance =goal_appointments.filter(status="DONE").count())
             goal_metric_serialied = GoalMetricsSerializer(goal_metric)
             return Response(goal_metric_serialied.data)
         except exceptions.ObjectDoesNotExist:
