@@ -13,4 +13,4 @@ class ActivitySerializer(serializers.ModelSerializer):
 
 
 class ActivityReadSerializer(ActivitySerializer):
-    doctor = UserSerializer(many=True)
+    doctors = UserSerializer(many=True)
