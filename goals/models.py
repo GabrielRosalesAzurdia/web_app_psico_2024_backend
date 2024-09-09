@@ -14,6 +14,7 @@ class GoalMetrics(models.Model):
     appointments = models.IntegerField()
     monthly_goal_porcentage = models.FloatField()
     assistance = models.IntegerField()
+    totalAppointments = models.IntegerField()
 
     def __str__(self):
         return f'{self.appointments} - {self.monthly_goal_porcentage} - {self.assistance}'
