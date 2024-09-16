@@ -67,7 +67,7 @@ class GoalSerializer(serializers.ModelSerializer):
         try:
             set_goal = Goal.objects.latest('created_at')
             goal_appointments = Appointment.objects.filter(goal=set_goal.pk)
-            GoalMetrics.objects.create(appointments = goal_appointments.count(), monthly_goal_porcentage = goal_appointments.count()/set_goal.apponitments_goal, assistance =goal_appointments.filter(status="DONE").count())
+            #GoalMetrics.objects.create(appointments = goal_appointments.count(), monthly_goal_porcentage = goal_appointments.count()/set_goal.apponitments_goal, assistance =goal_appointments.filter(status="DONE").count())
         except Goal.DoesNotExist:
             pass
         return goal
