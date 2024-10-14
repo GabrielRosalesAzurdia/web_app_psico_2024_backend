@@ -44,7 +44,7 @@ class GoalMetricsApiView(ListAPIView):
                 status=HTTP_404_NOT_FOUND
             )
         
-def render_to_pdf(template_src, context_dict={}):
+def render_to_pdf(template_src, context_dict):
     template = get_template(template_src)
     html  = template.render(context_dict)
     result = BytesIO()
@@ -59,6 +59,7 @@ def handleReport(request):
             set_goal = Goal.objects.get(start_time__lte = now().date(), end_time__gte = now().date())
             goal_appointments = Appointment.objects.filter(goal=set_goal.pk)
             data = {"appointments" : goal_appointments.count(), "monthly_goal_porcentage" : goal_appointments.count()/set_goal.apponitments_goal, "assistance" : goal_appointments.filter(status="DONE").count()}
+            print(data)
             pdf = render_to_pdf('goal/report.html',data)
             if pdf:
                 response = HttpResponse(pdf, content_type='application/pdf')
