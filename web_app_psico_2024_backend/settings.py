@@ -55,8 +55,10 @@ INSTALLED_APPS = [
     'activity.apps.ActivityConfig',
     'goals.apps.GoalsConfig',
 
+    'django.contrib.sites',
     'allauth',
     'allauth.account',
+    'allauth.socialaccount',
 ]
 
 MIDDLEWARE = [
