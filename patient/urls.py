@@ -3,7 +3,8 @@ from django.urls import path
 
 from patient.views import (
     PatientCreateApiView,
-    PatientRetrieveApiView
+    PatientRetrieveApiView,
+    PatientListApiView,
 )
 
 urlpatterns = [
@@ -12,4 +13,5 @@ urlpatterns = [
          name='patient-create'),
     path('<int:pk>/',
          PatientRetrieveApiView.as_view(), name='patient-detail'),
+    path('list/', PatientListApiView.as_view(), name='patient-list'),
 ]
