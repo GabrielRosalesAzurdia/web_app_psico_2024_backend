@@ -34,6 +34,7 @@ class AppointmentCreateApiView(ListCreateAPIView):
             'hour': request.data.get('hour'),
             'date': request.data.get('date'),
             'status': request.data.get('status'),
+            'place': request.data.get('place')
         })
 
         serializer.is_valid(raise_exception=True)

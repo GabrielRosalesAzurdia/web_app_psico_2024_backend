@@ -8,12 +8,23 @@ class Appointment(models.Model):
         DONE = 'DONE', _('Hecho')
         PENDING = 'PENDING', _('Pendiente')
         CANCELLED = 'CANCELLED', _('Cancelado')
+    class PlaceType(models.TextChoices):
+        CDO = 'CDO', _('CDO')
+        SEMILLERO = 'SEMILLERO', _('Semillero')
+        OTHER = 'OTHER', _('Otro')
 
     patient = models.ForeignKey(
         'patient.Patient',
         on_delete=models.PROTECT,
         related_name='appointment'
     )
+    place = models.CharField(
+        max_length=50,
+        choices=PlaceType.choices,
+        default=PlaceType.CDO
+    )
+    
+
     # created_by = models.ForeignKey(
     #     get_user_model(),
     #     on_delete=models.PROTECT,
