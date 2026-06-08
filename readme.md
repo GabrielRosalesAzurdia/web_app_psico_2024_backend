@@ -84,19 +84,45 @@ Valid values for `place`: `CDO`, `SEMILLERO`, `OTHER`
 
 Supports future and past (retroactive) dates.
 
-### List appointments / filter by patient
+### List appointments
 ```
 GET /api/v1/appointment/
-GET /api/v1/appointment/?patient=<id>
 ```
-Returns appointments ordered by date descending (most recent first).
-Supports pagination: 10 results per page.
+Supports the following query params:
+
+| Param | Description | Example |
+|---|---|---|
+| `patient` | Filter by patient id | `?patient=6` |
+| `doctor` | Filter by doctor id | `?doctor=1` |
+| `place` | Filter by place | `?place=CDO` |
+| `date_from` | Filter from date (inclusive) | `?date_from=2026-06-01` |
+| `date_to` | Filter to date (inclusive) | `?date_to=2026-06-30` |
+| `order` | Sort by date: `asc` or `desc` (default) | `?order=asc` |
+
+Params can be combined:
+```
+GET /api/v1/appointment/?patient=6&place=CDO&order=asc&date_from=2026-06-01&date_to=2026-12-31
+```
+
+Returns paginated results (10 per page). Each appointment includes `attendanceStatus`:
+- `PENDING` → `PENDIENTE`
+- `DONE` → `CUMPLIDA`
+- `CANCELLED` → `NO CUMPLIDA`
+
 ```json
 {
     "count": 4,
     "next": "http://127.0.0.1:8000/api/v1/appointment/?page=2",
     "previous": null,
-    "results": [...]
+    "results": [
+        {
+            "id": 3,
+            "date": "2026-07-10",
+            "status": "PENDING",
+            "attendanceStatus": "PENDIENTE",
+            ...
+        }
+    ]
 }
 ```
 

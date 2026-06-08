@@ -14,12 +14,39 @@ class AppointmentCreateApiView(ListCreateAPIView):
     serializer_class = AppointmentSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = AppointmentPagination
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return AppointmentReadSerializer
+        return AppointmentSerializer
+
     def get_queryset(self):
-        queryset = Appointment.objects.all().order_by('-date')
+        queryset = Appointment.objects.all()
+
         patient_id = self.request.query_params.get('patient')
+        doctor_id  = self.request.query_params.get('doctor')
+        place      = self.request.query_params.get('place')
+        date_from  = self.request.query_params.get('date_from')
+        date_to    = self.request.query_params.get('date_to')
+
         if patient_id:
             queryset = queryset.filter(patient=patient_id)
+        if doctor_id:
+            queryset = queryset.filter(doctor=doctor_id)
+        if place:
+            queryset = queryset.filter(place=place)
+        if date_from:
+            queryset = queryset.filter(date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(date__lte=date_to)
+
+        order = self.request.query_params.get('order', 'desc')
+        if order == 'asc':
+            queryset = queryset.order_by('date')
+        else:
+            queryset = queryset.order_by('-date')
+
         return queryset
+
 
     def post(self, request: Request, format=None, *args, **kwargs):
         serializer_class = self.get_serializer_class()

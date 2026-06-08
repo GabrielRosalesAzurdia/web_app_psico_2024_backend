@@ -24,4 +24,13 @@ class AppointmentSerializer(serializers.ModelSerializer):
 class AppointmentReadSerializer(AppointmentSerializer):
     patient = PatientSerializer()
     doctor = UserSerializer()
-    # created_by = UserSerializer()
+    attendance_status = serializers.SerializerMethodField()
+
+    def get_attendance_status(self, obj):
+        mapping = {
+            'PENDING':   'PENDIENTE',
+            'DONE':      'CUMPLIDA',
+            'CANCELLED': 'NO CUMPLIDA',
+        }
+        return mapping.get(obj.status, obj.status)
+
