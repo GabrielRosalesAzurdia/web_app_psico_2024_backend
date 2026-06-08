@@ -38,13 +38,6 @@ class Appointment(models.Model):
     )
     hour = models.TimeField()
     date = models.DateField()
-    goal = models.ForeignKey(
-        'goals.Goal',
-        on_delete=models.PROTECT,
-        related_name='goal',
-        blank=True,
-        null=True,
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     status = models.CharField(

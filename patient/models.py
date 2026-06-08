@@ -8,11 +8,19 @@ class Patient(models.Model):
         CDO = 'CDO', _('CDO')
         SEMILLERO = 'SEMILLERO', _('Semillero')
         EXTERNAL = 'EXTERNAL', _('Externo')
-
+    class GenderTypes(models.TextChoices):
+        MALE = 'MASCULINO', _('masculino')
+        FEMALE = 'FEMENINO',_('femenino')
+        OTHER = 'OTRO',_('otro')
     name = models.TextField()
     phone = models.CharField(max_length=250, blank=True, default='')
     age = models.IntegerField()
-    gender = models.CharField(max_length=250, blank=True,default='')
+    gender = models.CharField(
+        max_length=50,
+        choices=GenderTypes.choices,
+        default=GenderTypes.OTHER
+    )
+    
     grade = models.CharField(max_length=250, blank=True, default='')
     address = models.CharField(max_length=250, default='')
     tutor = models.CharField(max_length=250,default='')
@@ -21,7 +29,8 @@ class Patient(models.Model):
         max_length=50,
         choices=PlaceTypes.choices,
         default=PlaceTypes.CDO)
-    pacientNumber = models.IntegerField(blank=True, default=0)
+    
+    external_Id = models.CharField(max_length=250,blank=False, default=0)
     
     created_at = models.DateTimeField(auto_now_add=True)
     

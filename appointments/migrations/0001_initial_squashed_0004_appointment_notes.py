@@ -10,7 +10,6 @@ class Migration(migrations.Migration):
     replaces = [('appointments', '0001_initial'), ('appointments', '0002_appointment_goal_alter_appointment_status'), ('appointments', '0003_appointment_place'), ('appointments', '0004_appointment_notes')]
 
     dependencies = [
-        ('goals', '0001_initial'),
         ('patient', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -28,11 +27,6 @@ class Migration(migrations.Migration):
                 ('doctor', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='appointment', to=settings.AUTH_USER_MODEL)),
                 ('patient', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='appointment', to='patient.patient')),
             ],
-        ),
-        migrations.AddField(
-            model_name='appointment',
-            name='goal',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='goal', to='goals.goal'),
         ),
         migrations.AlterField(
             model_name='appointment',

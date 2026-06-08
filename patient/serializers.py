@@ -5,6 +5,7 @@ class PatientSerializer(serializers.ModelSerializer):
     created_by = serializers.HiddenField(
         default=serializers.CurrentUserDefault()
     )
+    id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Patient

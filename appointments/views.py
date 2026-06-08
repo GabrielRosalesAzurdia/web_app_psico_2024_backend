@@ -3,32 +3,28 @@ from rest_framework.permissions import IsAuthenticated
 from appointments.models import Appointment
 from appointments.serializers import AppointmentReadSerializer, AppointmentSerializer
 from django.utils.timezone import now
-from goals.models import Goal
 from rest_framework.response import Response
 from rest_framework.request import Request
-from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_201_CREATED
+from rest_framework.status import HTTP_201_CREATED
+from rest_framework.pagination import PageNumberPagination
 
-
+class AppointmentPagination(PageNumberPagination):
+    page_size = 10
 class AppointmentCreateApiView(ListCreateAPIView):
-    queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
     permission_classes = [IsAuthenticated]
-    # def get_queryset(self):
-    #     return Appointment.objects.filter(doctor=self.request.user.pk)
+    pagination_class = AppointmentPagination
+    def get_queryset(self):
+        queryset = Appointment.objects.all().order_by('-date')
+        patient_id = self.request.query_params.get('patient')
+        if patient_id:
+            queryset = queryset.filter(patient=patient_id)
+        return queryset
 
     def post(self, request: Request, format=None, *args, **kwargs):
-        try:
-            set_goal = Goal.objects.get(start_time__lte=now().date(), end_time__gte=now().date())
-        except Goal.DoesNotExist:
-            return Response(
-                {'message': 'No set goal'},
-                status=HTTP_404_NOT_FOUND
-            )
-
         serializer_class = self.get_serializer_class()
 
         serializer = serializer_class(data={
-            'goal': set_goal.pk,
             'patient': request.data.get('patient'),
             'doctor': request.data.get('doctor'),
             'hour': request.data.get('hour'),
@@ -43,18 +39,6 @@ class AppointmentCreateApiView(ListCreateAPIView):
         appointment_data = self.get_serializer(appointment).data
 
         return Response(appointment_data, status=HTTP_201_CREATED)
-    
-    # def perform_create(self, serializer):
-    #     try:
-    #         set_goal = Goal.objects.get(startTime__lte = now().date(), endTime__gte = now().date())
-    #         serializer.validated_data['goal'] = set_goal
-    #         serializer.save()
-    #     except exceptions.ObjectDoesNotExist:
-    #         print("entro al except")
-    #         return Response(
-    #             {'message': 'No set goal'},
-    #             status=HTTP_404_NOT_FOUND
-    #         )
 
 class AppointmentRetrieveApiView(RetrieveUpdateAPIView):
     queryset = Appointment.objects.all()

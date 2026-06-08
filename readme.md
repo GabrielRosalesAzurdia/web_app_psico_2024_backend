@@ -52,3 +52,63 @@ PUT    /api/v1/patient/<id>/
 PATCH  /api/v1/patient/<id>/
 DELETE /api/v1/patient/<id>/
 ```
+
+> **Nota:** El campo `id` es de solo lectura. Cualquier valor enviado en el body para `id` será ignorado.
+
+Valid values for `gender`: `MASCULINO`, `FEMENINO`, `OTRO`
+
+---
+
+## Appointment Endpoints `/api/v1/appointment/`
+
+All endpoints require JWT authentication: `Authorization: Bearer <token>`
+
+### Create appointment
+```
+POST /api/v1/appointment/
+```
+```json
+{
+    "patient": 1,
+    "doctor": 1,
+    "hour": "10:00:00",
+    "date": "2026-08-15",
+    "status": "PENDING",
+    "place": "CDO",
+    "notes": "Primera consulta"
+}
+```
+Valid values for `status`: `PENDING`, `DONE`, `CANCELLED`
+
+Valid values for `place`: `CDO`, `SEMILLERO`, `OTHER`
+
+Supports future and past (retroactive) dates.
+
+### List appointments / filter by patient
+```
+GET /api/v1/appointment/
+GET /api/v1/appointment/?patient=<id>
+```
+Returns appointments ordered by date descending (most recent first).
+Supports pagination: 10 results per page.
+```json
+{
+    "count": 4,
+    "next": "http://127.0.0.1:8000/api/v1/appointment/?page=2",
+    "previous": null,
+    "results": [...]
+}
+```
+
+### Get / Update appointment
+```
+GET   /api/v1/appointment/<id>/
+PUT   /api/v1/appointment/<id>/
+PATCH /api/v1/appointment/<id>/
+```
+
+### Pending appointments
+```
+GET /api/v1/appointment/pending/
+```
+Returns all appointments with status `PENDING` and future date, ordered ascending.

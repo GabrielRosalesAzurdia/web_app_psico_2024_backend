@@ -6,7 +6,6 @@ from patient.serializers import PatientSerializer
 
 from psico_auth.serializer import UserSerializer
 
-from goals.serializers import GoalSerializer
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -25,5 +24,4 @@ class AppointmentSerializer(serializers.ModelSerializer):
 class AppointmentReadSerializer(AppointmentSerializer):
     patient = PatientSerializer()
     doctor = UserSerializer()
-    goal = GoalSerializer()
     # created_by = UserSerializer()
