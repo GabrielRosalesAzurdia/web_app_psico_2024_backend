@@ -84,6 +84,8 @@ Valid values for `place`: `CDO`, `SEMILLERO`, `OTHER`
 
 Supports future and past (retroactive) dates.
 
+> **Nota:** No se puede marcar como `DONE` una cita con fecha futura. Solo se permiten `PENDING` y `CANCELLED` en citas futuras.
+
 ### List appointments
 ```
 GET /api/v1/appointment/
