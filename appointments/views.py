@@ -83,3 +83,9 @@ class AppointmentGetPendingApiView(ListAPIView):
     permission_classes = [IsAuthenticated]
     # def get_queryset(self):
     #     return Appointment.objects.filter(doctor=self.request.user.pk)
+class AppointmentTodayApiView(ListAPIView):
+    serializer_class = AppointmentReadSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Appointment.objects.filter(date=now().date()).order_by('hour')

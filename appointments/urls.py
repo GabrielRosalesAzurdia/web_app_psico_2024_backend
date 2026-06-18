@@ -4,7 +4,8 @@ from django.urls import path
 from appointments.views import (
     AppointmentCreateApiView,
     AppointmentRetrieveApiView,
-    AppointmentGetPendingApiView
+    AppointmentGetPendingApiView,
+    AppointmentTodayApiView
 )
 
 urlpatterns = [
@@ -16,4 +17,7 @@ urlpatterns = [
          name='appointment-pending'),
     path('<int:pk>/',
          AppointmentRetrieveApiView.as_view(), name='appointment-detail'),
+    path('today/',
+         AppointmentTodayApiView.as_view(),
+         name='appointment-today'),
 ]
