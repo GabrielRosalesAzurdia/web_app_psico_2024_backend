@@ -140,3 +140,68 @@ PATCH /api/v1/appointment/<id>/
 GET /api/v1/appointment/pending/
 ```
 Returns all appointments with status `PENDING` and future date, ordered ascending.
+
+### Today's appointments
+```
+GET /api/v1/appointment/today/
+```
+Returns all appointments scheduled for today, ordered by hour.
+
+---
+
+## Activity Endpoints `/api/v1/activity/`
+
+All endpoints require JWT authentication: `Authorization: Bearer <token>`
+
+### Create activity
+```
+POST /api/v1/activity/
+```
+```json
+{
+    "title": "Taller grupal",
+    "description": "Sesión de relajación",
+    "date": "2026-07-10",
+    "hour": "09:00:00",
+    "place": "CDO",
+    "status": "PENDING",
+    "activity_type": "Grupal",
+    "doctors": [1],
+    "patients": [1, 2]
+}
+```
+Valid values for `status`: `PENDING`, `DONE`, `CANCELLED`
+
+Valid values for `place`: `CDO`, `SEMILLERO`, `OTHER`
+
+> **Nota:** El campo `patients` es opcional — se puede omitir o enviar como lista vacía `[]`.
+
+### List activities
+```
+GET /api/v1/activity/
+```
+Supports the following query params:
+
+| Param | Description | Example |
+|---|---|---|
+| `date` | Filter by exact date | `?date=2026-07-10` |
+| `doctor` | Filter by doctor id | `?doctor=1` |
+| `patient` | Filter by patient id | `?patient=2` |
+
+Params can be combined:
+```
+GET /api/v1/activity/?doctor=1&date=2026-07-10
+```
+
+### Get / Update / Delete activity
+```
+GET    /api/v1/activity/<id>/
+PATCH  /api/v1/activity/<id>/
+DELETE /api/v1/activity/<id>/
+```
+
+### Pending activities
+```
+GET /api/v1/activity/pending/
+```
+Returns all activities with status `PENDING` and future date, ordered ascending.
