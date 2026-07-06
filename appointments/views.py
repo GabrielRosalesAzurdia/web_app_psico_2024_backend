@@ -139,10 +139,18 @@ class DashboardMonthlyProgressApiView(APIView):
             y -= 1
         three_months_ago = date_type(y, m, 1)
 
+        # Primer día del mes siguiente como límite superior
+        nm = today.month + 1
+        ny = today.year
+        if nm > 12:
+            nm = 1
+            ny += 1
+        next_month_start = date_type(ny, nm, 1)
+
         # Total de citas por mes los últimos 3 meses
         monthly = (
             Appointment.objects
-            .filter(date__gte=three_months_ago)
+            .filter(date__gte=three_months_ago, date__lt=next_month_start)
             .annotate(month=TruncMonth('date'))
             .values('month')
             .annotate(total=Count('id'))
