@@ -260,4 +260,4 @@ Returns appointment counts per day for the current month, plus monthly totals fo
 ```
 
 - `current_month`: one entry per day that has appointments, ordered ascending
-- `monthly_comparison`: total appointments per month for the last 3 months
+- `monthly_comparison`: total appointments per month for the last 3 months (excludes future months)
