@@ -8,6 +8,9 @@ from rest_framework.response import Response
 from rest_framework.request import Request
 from rest_framework.status import HTTP_201_CREATED
 from rest_framework.pagination import PageNumberPagination
+from django.db.models.functions import TruncDay, TruncMonth
+from django.db.models import Count
+from datetime import date as date_type
 
 class AppointmentPagination(PageNumberPagination):
     page_size = 10
@@ -106,4 +109,51 @@ class DashboardTodayApiView(APIView):
             'total_done':      citas_hoy.filter(status='DONE').count(),
             'total_cancelled': citas_hoy.filter(status='CANCELLED').count(),
             'pending_appointments': serializer.data,
+        })
+
+class DashboardMonthlyProgressApiView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = now().date()
+
+        # Citas por día del mes actual
+        daily = (
+            Appointment.objects
+            .filter(date__year=today.year, date__month=today.month)
+            .annotate(day=TruncDay('date'))
+            .values('day')
+            .annotate(count=Count('id'))
+            .order_by('day')
+        )
+        current_month = [
+            {"date": str(entry['day']), "count": entry['count']}
+            for entry in daily
+        ]
+
+        # Primer día de hace 2 meses para traer 3 meses en total
+        m = today.month - 2
+        y = today.year
+        if m <= 0:
+            m += 12
+            y -= 1
+        three_months_ago = date_type(y, m, 1)
+
+        # Total de citas por mes los últimos 3 meses
+        monthly = (
+            Appointment.objects
+            .filter(date__gte=three_months_ago)
+            .annotate(month=TruncMonth('date'))
+            .values('month')
+            .annotate(total=Count('id'))
+            .order_by('month')
+        )
+        monthly_comparison = [
+            {"month": entry['month'].strftime('%Y-%m'), "total": entry['total']}
+            for entry in monthly
+        ]
+
+        return Response({
+            "current_month": current_month,
+            "monthly_comparison": monthly_comparison,
         })

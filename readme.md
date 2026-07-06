@@ -237,3 +237,27 @@ Returns a summary of today's appointments.
     ]
 }
 ```
+
+### Monthly progress
+```
+GET /api/v1/dashboard/monthly-progress/
+```
+Returns appointment counts per day for the current month, plus monthly totals for the last 3 months. Response is structured for charting.
+
+```json
+{
+    "current_month": [
+        {"date": "2026-07-01", "count": 2},
+        {"date": "2026-07-03", "count": 5},
+        {"date": "2026-07-06", "count": 3}
+    ],
+    "monthly_comparison": [
+        {"month": "2026-05", "total": 15},
+        {"month": "2026-06", "total": 22},
+        {"month": "2026-07", "total": 10}
+    ]
+}
+```
+
+- `current_month`: one entry per day that has appointments, ordered ascending
+- `monthly_comparison`: total appointments per month for the last 3 months
