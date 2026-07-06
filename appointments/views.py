@@ -1,5 +1,6 @@
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from appointments.models import Appointment
 from appointments.serializers import AppointmentReadSerializer, AppointmentSerializer
 from django.utils.timezone import now
@@ -89,3 +90,20 @@ class AppointmentTodayApiView(ListAPIView):
 
     def get_queryset(self):
         return Appointment.objects.filter(date=now().date()).order_by('hour')
+class DashboardTodayApiView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = now().date()
+        citas_hoy = Appointment.objects.filter(date=today)
+
+        pendientes = citas_hoy.filter(status='PENDING')
+        serializer = AppointmentReadSerializer(pendientes, many=True)
+
+        return Response({
+            'total_today':     citas_hoy.count(),
+            'total_pending':   citas_hoy.filter(status='PENDING').count(),
+            'total_done':      citas_hoy.filter(status='DONE').count(),
+            'total_cancelled': citas_hoy.filter(status='CANCELLED').count(),
+            'pending_appointments': serializer.data,
+        })

@@ -205,3 +205,35 @@ DELETE /api/v1/activity/<id>/
 GET /api/v1/activity/pending/
 ```
 Returns all activities with status `PENDING` and future date, ordered ascending.
+
+---
+
+## Dashboard Endpoints `/api/v1/dashboard/`
+
+All endpoints require JWT authentication: `Authorization: Bearer <token>`
+
+### Today's summary
+```
+GET /api/v1/dashboard/today/
+```
+Returns a summary of today's appointments.
+
+```json
+{
+    "total_today": 5,
+    "total_pending": 2,
+    "total_done": 2,
+    "total_cancelled": 1,
+    "pending_appointments": [
+        {
+            "id": 3,
+            "date": "2026-07-06",
+            "hour": "09:00:00",
+            "status": "PENDING",
+            "attendance_status": "PENDIENTE",
+            "patient": { ... },
+            "doctor": { ... }
+        }
+    ]
+}
+```

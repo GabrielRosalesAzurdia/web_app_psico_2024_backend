@@ -3,7 +3,8 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 class Activity(models.Model):
-
+    title = models.CharField(max_length=250, blank=False)
+    description =models.TextField(max_length=250, blank=True, default="")
     class StatusType(models.TextChoices):
         DONE = 'DONE', _('Hecho')
         PENDING = 'PENDING', _('Pendiente')
@@ -17,6 +18,10 @@ class Activity(models.Model):
     doctors = models.ManyToManyField(
         get_user_model(),
         related_name='activity'
+    )
+    patients = models.ManyToManyField(
+        'patient.Patient',
+        related_name='activiti'
     )
     hour = models.TimeField()
     date = models.DateField()

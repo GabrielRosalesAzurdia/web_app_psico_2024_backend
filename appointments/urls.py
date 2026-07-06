@@ -1,11 +1,11 @@
 from django.urls import path
 
-
 from appointments.views import (
     AppointmentCreateApiView,
     AppointmentRetrieveApiView,
     AppointmentGetPendingApiView,
-    AppointmentTodayApiView
+    AppointmentTodayApiView,
+    DashboardTodayApiView,
 )
 
 urlpatterns = [
@@ -20,4 +20,7 @@ urlpatterns = [
     path('today/',
          AppointmentTodayApiView.as_view(),
          name='appointment-today'),
+    path('dashboard/today/',
+         DashboardTodayApiView.as_view(),
+         name='dashboard-today'),
 ]
