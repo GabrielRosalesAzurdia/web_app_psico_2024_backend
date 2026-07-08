@@ -19,7 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-from appointments.views import DashboardTodayApiView
+from appointments.views import DashboardTodayApiView,DashboardMonthlyProgressApiView
 
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/v1/patient/', include('patient.urls')),
     path('api/v1/appointment/', include('appointments.urls')),
     path('api/v1/dashboard/today/', DashboardTodayApiView.as_view(), name='dashboard-today'),
+    path('api/v1/dashboard/monthly-progress/', DashboardMonthlyProgressApiView.as_view(), name='dashboard-monthly'),
     path('api/v1/activity/', include('activity.urls')),
     path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/v1/docs/',

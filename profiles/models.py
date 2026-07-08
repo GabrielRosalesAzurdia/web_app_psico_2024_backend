@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 
+
 def create_profile_image_path(instance, filename: str):
     filename = filename.lower().replace(' ', '_').replace('-', '_')
 
