@@ -261,3 +261,109 @@ Returns appointment counts per day for the current month, plus monthly totals fo
 
 - `current_month`: one entry per day that has appointments, ordered ascending
 - `monthly_comparison`: total appointments per month for the last 3 months (excludes future months)
+
+---
+
+## Reports Endpoints `/api/v1/reports/`
+
+All endpoints except `verify` require JWT authentication: `Authorization: Bearer <token>`
+
+---
+
+### PDF mensual
+```
+GET /api/v1/reports/monthly/
+```
+Genera y descarga un PDF con el reporte del mes. Acepta:
+
+| Param | Default | Ejemplo |
+|---|---|---|
+| `year` | año actual | `?year=2026` |
+| `month` | mes actual | `?month=6` |
+
+El PDF incluye 6 secciones: asistencia, género, edad, grado, horarios y lista de citas anonimizadas. Lleva código QR de verificación firmado criptográficamente.
+
+---
+
+### Verificar autenticidad de documento (público)
+```
+GET /api/v1/reports/verify/<token>/
+```
+No requiere autenticación. Valida que un PDF fue generado por el sistema.
+
+```json
+// Documento válido
+{ "valid": true, "issued_by": "Daniel Padnos Wellness Center", "year": 2026, "month": 6, "total_appointments": 42, "generated": "2026-07-10" }
+
+// Documento alterado
+{ "valid": false, "message": "Documento no valido o fue alterado" }
+```
+
+---
+
+### Estadísticas de pacientes — `monthly-stats`
+```
+GET /api/v1/reports/monthly-stats/
+```
+**Qué responde:** qué pasó con los pacientes en el período filtrado.
+- Cuántas citas hubo y en qué estado (cumplidas / pendientes / canceladas)
+- Cuántos pacientes únicos atendidos
+- Distribución por género, edad y grado
+- Desglose de citas por mes
+
+```json
+{
+    "total_appointments": 42,
+    "by_status": { "DONE": 30, "PENDING": 8, "CANCELLED": 4 },
+    "unique_patients": 15,
+    "by_gender": [{ "gender": "FEMENINO", "count": 9 }, { "gender": "MASCULINO", "count": 6 }],
+    "by_age_group": { "0-10": 2, "11-17": 5, "18-25": 4, "26-40": 3, "40+": 1 },
+    "by_grade": [{ "grade": "5to", "count": 6 }, { "grade": "3ro", "count": 4 }],
+    "monthly_breakdown": [{ "month": "2026-05", "total": 18 }, { "month": "2026-06", "total": 24 }]
+}
+```
+
+---
+
+### Estadísticas de horarios — `schedule-stats`
+```
+GET /api/v1/reports/schedule-stats/
+```
+**Qué responde:** cómo se usan los horarios y la agenda.
+- A qué horas se agenda más
+- Qué días de la semana tienen más citas
+- Cuántas citas tiene cada doctor
+- Distribución por lugar (CDO, Semillero, etc.)
+
+```json
+{
+    "total_appointments": 42,
+    "by_hour": [{ "hour": "08:00:00", "count": 12 }, { "hour": "10:00:00", "count": 9 }],
+    "by_day_of_week": [{ "day": "Lunes", "count": 14 }, { "day": "Miércoles", "count": 11 }],
+    "by_doctor": [{ "doctor_id": 1, "doctor": "Ana Pérez", "count": 20 }],
+    "by_place": [{ "place": "CDO", "count": 30 }, { "place": "SEMILLERO", "count": 12 }]
+}
+```
+
+---
+
+### Filtros combinables (aplican a `monthly-stats` y `schedule-stats`)
+
+| Param | Filtra por | Ejemplo |
+|---|---|---|
+| `doctor_id` | ID exacto del doctor | `?doctor_id=1` |
+| `doctor_name` | Nombre o apellido del doctor (parcial) | `?doctor_name=ana` |
+| `nombre` | Nombre del paciente (parcial) | `?nombre=carlos` |
+| `grade` | Grado del paciente | `?grade=5to` |
+| `gender` | Género del paciente | `?gender=FEMENINO` |
+| `date_from` | Desde fecha (inclusive) | `?date_from=2026-01-01` |
+| `date_to` | Hasta fecha (inclusive) | `?date_to=2026-06-30` |
+| `age_min` | Edad mínima | `?age_min=10` |
+| `age_max` | Edad máxima | `?age_max=25` |
+| `internal_code` | Código interno del paciente | `?internal_code=ABC123` |
+
+Todos los filtros son opcionales y combinables entre sí:
+```
+GET /api/v1/reports/monthly-stats/?gender=FEMENINO&grade=5to&date_from=2026-01-01&date_to=2026-06-30
+GET /api/v1/reports/schedule-stats/?doctor_name=ana&age_min=10&age_max=20
+```
