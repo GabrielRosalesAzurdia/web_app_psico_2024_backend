@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.http import HttpResponse
 from django.utils.timezone import now
 from django.db.models import Count
+from django.db.models.functions import TruncMonth, ExtractWeekDay
 from io import BytesIO
 import calendar
 import qrcode
@@ -18,6 +19,48 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether
 from rest_framework.response import Response
+
+_DIAS_SEMANA = {1: 'Domingo', 2: 'Lunes', 3: 'Martes', 4: 'Miércoles', 5: 'Jueves', 6: 'Viernes', 7: 'Sábado'}
+
+def _apply_filters(queryset, params):
+    """Aplica filtros combinables al queryset de Appointment."""
+    doctor_id     = params.get('doctor_id')
+    doctor_name   = params.get('doctor_name')
+    grade         = params.get('grade')
+    gender        = params.get('gender')
+    nombre        = params.get('nombre')
+    date_from     = params.get('date_from')
+    date_to       = params.get('date_to')
+    age_min       = params.get('age_min')
+    age_max       = params.get('age_max')
+    internal_code = params.get('internal_code')
+
+    if doctor_id:
+        queryset = queryset.filter(doctor_id=doctor_id)
+    if doctor_name:
+        queryset = queryset.filter(
+            doctor__first_name__icontains=doctor_name
+        ) | queryset.filter(
+            doctor__last_name__icontains=doctor_name
+        )
+    if grade:
+        queryset = queryset.filter(patient__grade=grade)
+    if gender:
+        queryset = queryset.filter(patient__gender=gender)
+    if nombre:
+        queryset = queryset.filter(patient__name__icontains=nombre)
+    if date_from:
+        queryset = queryset.filter(date__gte=date_from)
+    if date_to:
+        queryset = queryset.filter(date__lte=date_to)
+    if age_min:
+        queryset = queryset.filter(patient__age__gte=int(age_min))
+    if age_max:
+        queryset = queryset.filter(patient__age__lte=int(age_max))
+    if internal_code:
+        queryset = queryset.filter(patient__external_Id=internal_code)
+
+    return queryset
 
 class MonthlyReportApiView(APIView):
     permission_classes = [IsAuthenticated]
@@ -240,6 +283,105 @@ class ReportVerifyApiView(APIView):
             return Response({
                 'valid': False,
                 'message': 'Documento no valido o fue alterado',
-                
+
             },status=400
             )
+
+class MonthlyStatsApiView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        queryset = _apply_filters(Appointment.objects.all(), request.query_params)
+
+        total     = queryset.count()
+        done      = queryset.filter(status='DONE').count()
+        pending   = queryset.filter(status='PENDING').count()
+        cancelled = queryset.filter(status='CANCELLED').count()
+
+        # Pacientes unicos que aparecen en las citas filtradas
+        patient_ids = queryset.values_list('patient_id', flat=True).distinct()
+        patients    = Patient.objects.filter(id__in=patient_ids)
+
+        gender_dist = list(patients.values('gender').annotate(count=Count('id')).order_by('-count'))
+        grade_dist  = list(patients.values('grade').annotate(count=Count('id')).order_by('-count'))
+
+        age_groups = {'0-10': 0, '11-17': 0, '18-25': 0, '26-40': 0, '40+': 0}
+        for age in patients.values_list('age', flat=True):
+            if age <= 10:   age_groups['0-10'] += 1
+            elif age <= 17: age_groups['11-17'] += 1
+            elif age <= 25: age_groups['18-25'] += 1
+            elif age <= 40: age_groups['26-40'] += 1
+            else:           age_groups['40+'] += 1
+
+        monthly_breakdown = [
+            {'month': entry['month'].strftime('%Y-%m'), 'total': entry['total']}
+            for entry in (
+                queryset
+                .annotate(month=TruncMonth('date'))
+                .values('month')
+                .annotate(total=Count('id'))
+                .order_by('month')
+            )
+        ]
+
+        return Response({
+            'total_appointments': total,
+            'by_status': {'DONE': done, 'PENDING': pending, 'CANCELLED': cancelled},
+            'unique_patients': patients.count(),
+            'by_gender': gender_dist,
+            'by_age_group': age_groups,
+            'by_grade': grade_dist,
+            'monthly_breakdown': monthly_breakdown,
+        })
+
+
+class ScheduleStatsApiView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        queryset = _apply_filters(Appointment.objects.all(), request.query_params)
+
+        # Distribucion por hora
+        by_hour = list(
+            queryset.values('hour').annotate(count=Count('id')).order_by('hour')
+        )
+
+        # Distribucion por dia de semana (1=Domingo ... 7=Sabado en Django/SQL)
+        by_day = [
+            {'day': _DIAS_SEMANA.get(e['weekday'], str(e['weekday'])), 'count': e['count']}
+            for e in (
+                queryset
+                .annotate(weekday=ExtractWeekDay('date'))
+                .values('weekday')
+                .annotate(count=Count('id'))
+                .order_by('weekday')
+            )
+        ]
+
+        # Distribucion por doctor
+        by_doctor = [
+            {
+                'doctor_id': d['doctor_id'],
+                'doctor': f"{d['doctor__first_name']} {d['doctor__last_name']}".strip(),
+                'count': d['count'],
+            }
+            for d in (
+                queryset
+                .values('doctor_id', 'doctor__first_name', 'doctor__last_name')
+                .annotate(count=Count('id'))
+                .order_by('-count')
+            )
+        ]
+
+        # Distribucion por lugar
+        by_place = list(
+            queryset.values('place').annotate(count=Count('id')).order_by('-count')
+        )
+
+        return Response({
+            'total_appointments': queryset.count(),
+            'by_hour': by_hour,
+            'by_day_of_week': by_day,
+            'by_doctor': by_doctor,
+            'by_place': by_place,
+        })
