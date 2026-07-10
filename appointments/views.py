@@ -31,6 +31,9 @@ class AppointmentCreateApiView(ListCreateAPIView):
         place      = self.request.query_params.get('place')
         date_from  = self.request.query_params.get('date_from')
         date_to    = self.request.query_params.get('date_to')
+        status  = self.request.query_params.get('status')
+        if status:
+            queryset = queryset.filter(status=status)
 
         if patient_id:
             queryset = queryset.filter(patient=patient_id)

@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/v1/dashboard/today/', DashboardTodayApiView.as_view(), name='dashboard-today'),
     path('api/v1/dashboard/monthly-progress/', DashboardMonthlyProgressApiView.as_view(), name='dashboard-monthly'),
     path('api/v1/activity/', include('activity.urls')),
+    path('api/v1/reports/', include('reports.urls')),
     path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/v1/docs/',
          SpectacularSwaggerView.as_view(url_name='schema'),

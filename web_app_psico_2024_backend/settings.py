@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
-
 import dj_database_url 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -55,11 +54,13 @@ INSTALLED_APPS = [
     'patient.apps.PatientConfig',
     'appointments.apps.AppointmentsConfig',
     'activity.apps.ActivityConfig',
+    'reports',
 
     'django.contrib.sites',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
+    
 ]
 
 MIDDLEWARE = [
