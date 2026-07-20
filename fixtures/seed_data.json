@@ -1,0 +1,292 @@
+[
+{
+  "model": "auth.group",
+  "pk": 1,
+  "fields": {
+    "name": "client",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 4,
+  "fields": {
+    "password": "pbkdf2_sha256$870000$rQNIk5jVTnH5NCXef5e1o1$4YJ18rLec9XuYg/R+zFHnXT7rYKSXu61E/Vd063O+ks=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "alejandro",
+    "first_name": "Alejandro",
+    "last_name": "Eduardo",
+    "email": "alejandro@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2024-05-08T00:43:44.391Z",
+    "groups": [1],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 7,
+  "fields": {
+    "password": "pbkdf2_sha256$870000$rQNIk5jVTnH5NCXef5e1o1$4YJ18rLec9XuYg/R+zFHnXT7rYKSXu61E/Vd063O+ks=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "Admin",
+    "last_name": "Sistema",
+    "email": "admin@gmail.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2024-06-09T01:20:24.694Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 8,
+  "fields": {
+    "password": "pbkdf2_sha256$870000$rQNIk5jVTnH5NCXef5e1o1$4YJ18rLec9XuYg/R+zFHnXT7rYKSXu61E/Vd063O+ks=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "jennyperalta@gmail.com",
+    "first_name": "Jenny",
+    "last_name": "Peralta",
+    "email": "jennyperalta@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2025-04-09T19:51:44Z",
+    "groups": [1],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 9,
+  "fields": {
+    "password": "pbkdf2_sha256$870000$rQNIk5jVTnH5NCXef5e1o1$4YJ18rLec9XuYg/R+zFHnXT7rYKSXu61E/Vd063O+ks=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "andre",
+    "first_name": "Andre",
+    "last_name": "Example",
+    "email": "andre@example.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-06-18T17:30:56.826Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 10,
+  "fields": {
+    "password": "pbkdf2_sha256$870000$rQNIk5jVTnH5NCXef5e1o1$4YJ18rLec9XuYg/R+zFHnXT7rYKSXu61E/Vd063O+ks=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "andrea",
+    "first_name": "Andrea",
+    "last_name": "Pichilla",
+    "email": "andreapichilla@elpatojismo.edu.gt",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-06-18T18:11:08Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "profiles.profile",
+  "pk": 4,
+  "fields": {
+    "user": 4,
+    "completed": false,
+    "image": "",
+    "phone_number": ""
+  }
+},
+{
+  "model": "profiles.profile",
+  "pk": 7,
+  "fields": {
+    "user": 7,
+    "completed": false,
+    "image": "",
+    "phone_number": ""
+  }
+},
+{
+  "model": "profiles.profile",
+  "pk": 8,
+  "fields": {
+    "user": 8,
+    "completed": false,
+    "image": "",
+    "phone_number": ""
+  }
+},
+{
+  "model": "patient.patient",
+  "pk": 1,
+  "fields": {
+    "name": "Marcos Morales",
+    "phone": "3123123",
+    "age": 32,
+    "gender": "MASCULINO",
+    "grade": "Segundo basico",
+    "address": "Zona 1, Guatemala",
+    "tutor": "Ana Morales",
+    "managers_phone_number": "55551111",
+    "place": "CDO",
+    "external_Id": "EXT-100",
+    "created_at": "2024-05-08T02:45:21.447Z",
+    "state": true,
+    "stateDescription": "",
+    "created_by": 4
+  }
+},
+{
+  "model": "patient.patient",
+  "pk": 2,
+  "fields": {
+    "name": "Joaquin Sian",
+    "phone": "43242323",
+    "age": 15,
+    "gender": "MASCULINO",
+    "grade": "Tercero basico",
+    "address": "Zona 7, Guatemala",
+    "tutor": "Rosa Sian",
+    "managers_phone_number": "55552222",
+    "place": "SEMILLERO",
+    "external_Id": "EXT-101",
+    "created_at": "2024-05-08T02:45:51.578Z",
+    "state": true,
+    "stateDescription": "",
+    "created_by": 4
+  }
+},
+{
+  "model": "patient.patient",
+  "pk": 3,
+  "fields": {
+    "name": "Jorge Vega",
+    "phone": "43242323",
+    "age": 12,
+    "gender": "MASCULINO",
+    "grade": "Primero basico",
+    "address": "Zona 12, Guatemala",
+    "tutor": "Carmen Vega",
+    "managers_phone_number": "55553333",
+    "place": "SEMILLERO",
+    "external_Id": "EXT-102",
+    "created_at": "2024-08-19T20:42:44.563Z",
+    "state": true,
+    "stateDescription": "",
+    "created_by": 4
+  }
+},
+{
+  "model": "appointments.appointment",
+  "pk": 20,
+  "fields": {
+    "patient": 1,
+    "place": "CDO",
+    "notes": "Primera sesion",
+    "doctor": 8,
+    "hour": "09:00:00",
+    "date": "2025-04-11",
+    "created_at": "2025-04-09T19:53:00.635Z",
+    "updated_at": "2025-04-09T19:53:00.635Z",
+    "status": "DONE"
+  }
+},
+{
+  "model": "appointments.appointment",
+  "pk": 21,
+  "fields": {
+    "patient": 2,
+    "place": "CDO",
+    "notes": "Seguimiento mensual",
+    "doctor": 8,
+    "hour": "15:00:00",
+    "date": "2025-04-21",
+    "created_at": "2025-04-09T19:53:17.436Z",
+    "updated_at": "2025-04-09T19:53:17.436Z",
+    "status": "DONE"
+  }
+},
+{
+  "model": "appointments.appointment",
+  "pk": 22,
+  "fields": {
+    "patient": 3,
+    "place": "CDO",
+    "notes": "Evaluacion inicial",
+    "doctor": 8,
+    "hour": "13:00:00",
+    "date": "2025-04-01",
+    "created_at": "2025-04-09T19:53:34.723Z",
+    "updated_at": "2025-04-09T19:53:34.723Z",
+    "status": "DONE"
+  }
+},
+{
+  "model": "appointments.appointment",
+  "pk": 23,
+  "fields": {
+    "patient": 1,
+    "place": "CDO",
+    "notes": "Sesion de seguimiento",
+    "doctor": 4,
+    "hour": "09:00:00",
+    "date": "2025-05-11",
+    "created_at": "2025-04-10T01:16:45.360Z",
+    "updated_at": "2025-04-10T01:16:45.360Z",
+    "status": "DONE"
+  }
+},
+{
+  "model": "activity.activity",
+  "pk": 1,
+  "fields": {
+    "hour": "12:00:00",
+    "date": "2025-04-20",
+    "created_at": "2025-04-09T19:54:19.696Z",
+    "updated_at": "2025-04-09T19:54:19.696Z",
+    "activity_type": "Capacitacion grupal",
+    "status": "DONE",
+    "place": "CDO",
+    "doctors": [4, 8]
+  }
+},
+{
+  "model": "activity.activity",
+  "pk": 2,
+  "fields": {
+    "hour": "18:00:00",
+    "date": "2025-04-18",
+    "created_at": "2025-04-09T19:54:32.265Z",
+    "updated_at": "2025-04-09T19:54:32.265Z",
+    "activity_type": "Taller de convivencia",
+    "status": "DONE",
+    "place": "SEMILLERO",
+    "doctors": [8]
+  }
+},
+{
+  "model": "activity.activity",
+  "pk": 3,
+  "fields": {
+    "hour": "15:00:00",
+    "date": "2025-05-27",
+    "created_at": "2025-05-20T21:53:44.948Z",
+    "updated_at": "2025-05-20T21:53:44.948Z",
+    "activity_type": "Reunion de evaluacion del proceso",
+    "status": "DONE",
+    "place": "CDO",
+    "doctors": [4, 7]
+  }
+}
+]
