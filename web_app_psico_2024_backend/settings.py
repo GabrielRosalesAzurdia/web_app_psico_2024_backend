@@ -13,22 +13,42 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
-import dj_database_url 
+import dj_database_url
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Loads BASE_DIR/.env into os.environ for local development only.
+# In production (Render) no .env file exists on disk; Render injects
+# env vars directly into the process, so this call is a harmless no-op there.
+load_dotenv(BASE_DIR / '.env')
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
+
+def _env_bool(name, default=False):
+    return os.environ.get(name, str(default)).lower() in ('1', 'true', 'yes', 'on')
+
+
+def _env_list(name, default):
+    raw = os.environ.get(name)
+    items = raw.split(',') if raw else default
+    return [item.strip() for item in items if item.strip()]
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-jx!=ldldlbfd*9o7184)=@xsk#sesckqbff!hgfq79y$i)qovi"
+# Render already provisions a real generated SECRET_KEY via render.yaml
+# (generateValue: true). The fallback below is ONLY for local dev when
+# no .env/SECRET_KEY is set and is never used in production.
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-local-dev-only-CHANGE-ME')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _env_bool('DEBUG', default=False)
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', [
+    'tulip-backend-7265.onrender.com',
+    'localhost',
+    '127.0.0.1',
+])
 
 
 # Application definition
@@ -219,4 +239,24 @@ SPECTACULAR_SETTINGS = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = _env_list('CORS_ALLOWED_ORIGINS', [
+    'https://wellness-app-frontend.onrender.com',
+])
+
+CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS', [
+    'https://tulip-backend-7265.onrender.com',
+])
+
+# Render terminates TLS at the edge and proxies to the app over plain HTTP,
+# setting X-Forwarded-Proto. Without this, Django's request.is_secure() is
+# always False behind the proxy, which breaks admin-login CSRF checks and
+# SECURE_SSL_REDIRECT.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 7  # 1 week; raise once confirmed stable
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
