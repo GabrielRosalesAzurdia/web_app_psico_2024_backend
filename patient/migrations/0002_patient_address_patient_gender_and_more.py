@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='patient',
             name='managers_phone_number',
-            field=models.IntegerField(default='', verbose_name=250),
+            field=models.CharField(default=' '),
         ),
         migrations.AlterField(
             model_name='patient',
