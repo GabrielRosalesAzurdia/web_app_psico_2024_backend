@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='patient',
             name='managers_phone_number',
-            field=models.IntegerField(default='', verbose_name=250),
+            field=models.CharField(default=' '),
         ),
         migrations.AlterField(
             model_name='patient',
@@ -59,11 +59,6 @@ class Migration(migrations.Migration):
             model_name='patient',
             name='name_of_manager',
             field=models.CharField(default='', max_length=250),
-        ),
-        migrations.AlterField(
-            model_name='patient',
-            name='managers_phone_number',
-            field=models.CharField(default=' '),
         ),
         migrations.RenameField(
             model_name='patient',
