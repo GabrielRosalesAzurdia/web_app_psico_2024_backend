@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
+from django.utils.timezone import now
+
 
 class Patient(models.Model):
 
@@ -15,6 +17,7 @@ class Patient(models.Model):
     name = models.TextField()
     phone = models.CharField(max_length=250, blank=True, default='')
     age = models.IntegerField()
+    birth_date = models.DateField(null=True, blank=True)
     gender = models.CharField(
         max_length=50,
         choices=GenderTypes.choices,
@@ -42,6 +45,20 @@ class Patient(models.Model):
         on_delete=models.PROTECT,
         related_name='patient'
     )
+
+    @staticmethod
+    def calculate_age(birth_date, on_date=None):
+        on_date = on_date or now().date()
+        years = on_date.year - birth_date.year
+        had_birthday_this_year = (on_date.month, on_date.day) >= (birth_date.month, birth_date.day)
+        if not had_birthday_this_year:
+            years -= 1
+        return years
+
+    def save(self, *args, **kwargs):
+        if self.birth_date:
+            self.age = self.calculate_age(self.birth_date)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.name} - {self.phone} - {self.age}'

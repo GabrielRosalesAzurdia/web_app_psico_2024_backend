@@ -88,7 +88,8 @@ class MonthlyReportApiView(APIView):
 
         # Edad agrupada en rangos
         age_groups = {'0-10': 0, '11-17': 0, '18-25': 0, '26-40': 0, '40+': 0}
-        for age in patients.values_list('age', flat=True):
+        for birth_date, stored_age in patients.values_list('birth_date', 'age'):
+            age = Patient.calculate_age(birth_date) if birth_date else stored_age
             if age <= 10:   age_groups['0-10'] += 1
             elif age <= 17: age_groups['11-17'] += 1
             elif age <= 25: age_groups['18-25'] += 1
@@ -306,7 +307,8 @@ class MonthlyStatsApiView(APIView):
         grade_dist  = list(patients.values('grade').annotate(count=Count('id')).order_by('-count'))
 
         age_groups = {'0-10': 0, '11-17': 0, '18-25': 0, '26-40': 0, '40+': 0}
-        for age in patients.values_list('age', flat=True):
+        for birth_date, stored_age in patients.values_list('birth_date', 'age'):
+            age = Patient.calculate_age(birth_date) if birth_date else stored_age
             if age <= 10:   age_groups['0-10'] += 1
             elif age <= 17: age_groups['11-17'] += 1
             elif age <= 25: age_groups['18-25'] += 1
