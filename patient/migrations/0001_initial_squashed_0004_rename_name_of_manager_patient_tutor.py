@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='patient',
             name='managers_phone_number',
-            field=models.CharField(default=' '),
+            field=models.CharField(default=' ', max_length=250),
         ),
         migrations.AlterField(
             model_name='patient',

@@ -23,7 +23,7 @@ class Appointment(models.Model):
         choices=PlaceType.choices,
         default=PlaceType.CDO
     )
-    notes = models.TextField()
+    notes = models.TextField(blank=True, default='')
     
 
     # created_by = models.ForeignKey(
