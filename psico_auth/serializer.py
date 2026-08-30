@@ -40,9 +40,12 @@ class UserRegisterSerializer(RegisterSerializer):
 
         user = super().save(request)
         user.groups.add(group)
-        Profile.objects.create(
+        # profiles/signals.py ya crea un Profile vacio en el post_save del
+        # User (get_or_create); usar create() aca duplicaba la fila y
+        # rompia el registro con IntegrityError (UNIQUE user_id).
+        Profile.objects.update_or_create(
             user=user,
-            phone_number=phone_number)
+            defaults={"phone_number": phone_number})
 
         return user
 
