@@ -23,7 +23,11 @@ class Activity(models.Model):
         'patient.Patient',
         related_name='activiti'
     )
-    hour = models.TimeField()
+    # RF-17: la actividad registra hora de inicio y hora de fin (antes solo
+    # tenía "hour"). end_hour queda nullable a nivel de BD para no romper
+    # filas ya existentes; el serializer la exige en cada creación/edición.
+    start_hour = models.TimeField()
+    end_hour = models.TimeField(null=True, blank=True)
     date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
