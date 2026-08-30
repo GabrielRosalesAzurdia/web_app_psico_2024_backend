@@ -1,4 +1,4 @@
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateAPIView, ListAPIView
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from appointments.models import Appointment
@@ -25,6 +25,11 @@ class AppointmentCreateApiView(ListCreateAPIView):
 
     def get_queryset(self):
         queryset = Appointment.objects.all()
+
+        # RF-19: por defecto solo se listan citas activas; ?includeInactive=true
+        # (llega como include_inactive) trae tambien las desactivadas.
+        if self.request.query_params.get('include_inactive') != 'true':
+            queryset = queryset.filter(is_active=True)
 
         patient_id = self.request.query_params.get('patient')
         doctor_id  = self.request.query_params.get('doctor')
@@ -74,7 +79,7 @@ class AppointmentCreateApiView(ListCreateAPIView):
 
         return Response(appointment_data, status=HTTP_201_CREATED)
 
-class AppointmentRetrieveApiView(RetrieveUpdateAPIView):
+class AppointmentRetrieveApiView(RetrieveUpdateDestroyAPIView):
     queryset = Appointment.objects.all()
 
     def get_serializer_class(self):
@@ -82,26 +87,34 @@ class AppointmentRetrieveApiView(RetrieveUpdateAPIView):
             return AppointmentSerializer
         return AppointmentReadSerializer
     permission_classes = [IsAuthenticated]
+
+    def perform_destroy(self, instance):
+        # RF-19: no se elimina la fila (se perderia el historial); se
+        # desactiva, igual que Patient.
+        instance.is_active = False
+        instance.save()
     
 class AppointmentGetPendingApiView(ListAPIView):
-    today = now().date()
-    queryset = Appointment.objects.filter(date__gte=today, status="PENDING").order_by('date')
     serializer_class = AppointmentReadSerializer
     permission_classes = [IsAuthenticated]
-    # def get_queryset(self):
-    #     return Appointment.objects.filter(doctor=self.request.user.pk)
+
+    def get_queryset(self):
+        today = now().date()
+        return Appointment.objects.filter(
+            date__gte=today, status="PENDING", is_active=True
+        ).order_by('date')
 class AppointmentTodayApiView(ListAPIView):
     serializer_class = AppointmentReadSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Appointment.objects.filter(date=now().date()).order_by('hour')
+        return Appointment.objects.filter(date=now().date(), is_active=True).order_by('hour')
 class DashboardTodayApiView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         today = now().date()
-        citas_hoy = Appointment.objects.filter(date=today)
+        citas_hoy = Appointment.objects.filter(date=today, is_active=True)
 
         pendientes = citas_hoy.filter(status='PENDING')
         serializer = AppointmentReadSerializer(pendientes, many=True)

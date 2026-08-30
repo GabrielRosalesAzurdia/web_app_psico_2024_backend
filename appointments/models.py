@@ -45,5 +45,11 @@ class Appointment(models.Model):
         choices=StatusType.choices,
         default=StatusType.PENDING)
 
+    # RF-19: no se permite eliminar citas (se pierde el historial); en vez
+    # de borrar la fila, se desactiva. Distinto de "status" (asistencia
+    # cumplida/pendiente/cancelada), que sigue siendo un estado que el
+    # psicologo elige activamente sobre una cita vigente.
+    is_active = models.BooleanField(default=True)
+
     def __str__(self):
         return f'{self.date} - {self.patient} - {self.doctor}'

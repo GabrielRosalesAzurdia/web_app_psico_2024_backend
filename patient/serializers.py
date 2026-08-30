@@ -22,6 +22,18 @@ class PatientSerializer(serializers.ModelSerializer):
         # junto con el campo "external_id" declarado arriba (mismo source).
         exclude = ['external_Id']
 
+    def validate_name(self, value):
+        # RF-19: nombre unico en toda la base de datos al crear (incluye
+        # pacientes desactivados, ya que is_active no borra la fila). Solo
+        # aplica al crear: al editar, el paciente puede conservar su propio
+        # nombre sin chocar consigo mismo.
+        if self.instance is None:
+            if Patient.objects.filter(name__iexact=value.strip()).exists():
+                raise serializers.ValidationError(
+                    "Ya existe un paciente registrado con este nombre."
+                )
+        return value
+
     def validate(self, data):
         birth_date = data.get('birth_date') or (self.instance.birth_date if self.instance else None)
         age = data.get('age') if 'age' in data else (self.instance.age if self.instance else None)

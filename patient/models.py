@@ -40,6 +40,12 @@ class Patient(models.Model):
     state = models.BooleanField()
     stateDescription =models.TextField(blank=True, default='')
 
+    # RF-19: distinto de "state" (que es el estado de asistencia
+    # Activo/Inasistencia/Pendiente, ver PatientForm.tsx). is_active
+    # controla si el paciente fue "eliminado" -> en vez de borrar la fila
+    # (y perder el historial de citas asociadas), se desactiva.
+    is_active = models.BooleanField(default=True)
+
     created_by = models.ForeignKey(
         get_user_model(),
         on_delete=models.PROTECT,
