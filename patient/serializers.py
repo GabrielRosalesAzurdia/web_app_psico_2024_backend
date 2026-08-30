@@ -7,10 +7,20 @@ class PatientSerializer(serializers.ModelSerializer):
     )
     id = serializers.IntegerField(read_only=True)
     age = serializers.IntegerField(required=False)
+    # external_Id no es snake_case ni camelCase puro (tiene una "I" mayúscula
+    # a mitad de palabra), así que djangorestframework-camel-case nunca
+    # produce/reconoce la clave correcta automáticamente en ninguna dirección.
+    # El parser de entrada convierte "externalId" -> "external_id" antes de
+    # que el serializer lo vea, así que el campo debe declararse con ese
+    # nombre exacto (minúscula); el renderer de salida lo vuelve a camelizar
+    # a "externalId" para el frontend.
+    external_id = serializers.CharField(source='external_Id', required=False, allow_blank=True)
 
     class Meta:
         model = Patient
-        fields = '__all__'
+        # Se excluye el atributo crudo del modelo para no duplicar el dato
+        # junto con el campo "external_id" declarado arriba (mismo source).
+        exclude = ['external_Id']
 
     def validate(self, data):
         birth_date = data.get('birth_date') or (self.instance.birth_date if self.instance else None)
