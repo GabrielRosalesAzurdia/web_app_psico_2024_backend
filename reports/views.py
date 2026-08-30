@@ -35,6 +35,7 @@ def _apply_filters(queryset, params):
     age_min       = params.get('age_min')
     age_max       = params.get('age_max')
     internal_code = params.get('internal_code')
+    hour          = params.get('hour')
 
     if doctor_id:
         queryset = queryset.filter(doctor_id=doctor_id)
@@ -60,6 +61,8 @@ def _apply_filters(queryset, params):
         queryset = queryset.filter(patient__age__lte=int(age_max))
     if internal_code:
         queryset = queryset.filter(patient__external_Id=internal_code)
+    if hour:
+        queryset = queryset.filter(hour=hour)
 
     return queryset
 
@@ -71,8 +74,14 @@ class MonthlyReportApiView(APIView):
         year  = int(request.query_params.get('year', today.year))
         month = int(request.query_params.get('month', today.month))
 
-        # Citas del mes
-        appointments = Appointment.objects.filter(date__year=year, date__month=month)
+        # Citas del mes (con los filtros combinables de RF-10: antes esta
+        # vista nunca llamaba a _apply_filters, asi que ningun filtro del
+        # formulario de Reportes -incluida la "Hora" recien agregada-
+        # afectaba al PDF real, solo al chequeo previo de /monthly-stats/).
+        appointments = _apply_filters(
+            Appointment.objects.filter(date__year=year, date__month=month),
+            request.query_params
+        )
         total = appointments.count()
 
         # RF-18: actividades del mes (con su horario), para que el reporte
