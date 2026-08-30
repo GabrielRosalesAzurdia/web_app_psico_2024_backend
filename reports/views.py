@@ -11,6 +11,7 @@ from PIL import Image as PILImage
 from reportlab.platypus import Image as RLImage
 from reportlab.lib.units import cm
 from appointments.models import Appointment
+from activity.models import Activity
 from patient.models import Patient
 from django.core import signing
 from reportlab.lib.pagesizes import letter
@@ -74,6 +75,15 @@ class MonthlyReportApiView(APIView):
         appointments = Appointment.objects.filter(date__year=year, date__month=month)
         total = appointments.count()
 
+        # RF-18: actividades del mes (con su horario), para que el reporte
+        # no muestre solo el horario de citas.
+        activities = Activity.objects.filter(date__year=year, date__month=month)
+        doctor_id = request.query_params.get('doctor_id')
+        if doctor_id:
+            activities = activities.filter(doctors__id=doctor_id)
+        activities = activities.distinct()
+        total_activities = activities.count()
+
         # Asistencia
         done      = appointments.filter(status='DONE').count()
         pending   = appointments.filter(status='PENDING').count()
@@ -120,7 +130,10 @@ class MonthlyReportApiView(APIView):
         month_name = calendar.month_name[month]
         elements.append(Paragraph("Daniel Padnos Wellness Center", title_style))
         elements.append(Paragraph(f"Reporte Mensual — {month_name} {year}", title_style))
-        elements.append(Paragraph(f"Generado: {today}  |  Total de citas: {total}", sub_style))
+        elements.append(Paragraph(
+            f"Generado: {today}  |  Total de citas: {total}  |  Total de actividades: {total_activities}",
+            sub_style
+        ))
 
         table_style = TableStyle([
             ('BACKGROUND',    (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
@@ -226,8 +239,29 @@ class MonthlyReportApiView(APIView):
             t6,
         ]))
         elements.append(Spacer(1, 20))
-            
-        
+
+        # Sección 7: Horarios de actividades del mes (RF-18)
+        activity_data = [['Título', 'Fecha', 'Hora inicio', 'Hora fin', 'Lugar']]
+        for act in activities.order_by('date', 'start_hour'):
+            activity_data.append([
+                act.title,
+                str(act.date),
+                str(act.start_hour),
+                str(act.end_hour) if act.end_hour else '-',
+                act.place,
+            ])
+        if len(activity_data) == 1:
+            activity_data.append(['Sin actividades registradas este mes.', '', '', '', ''])
+        t7 = Table(activity_data, colWidths=[1.8*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1.1*inch])
+        t7.setStyle(table_style)
+        elements.append(KeepTogether([
+            Paragraph("7. Horarios de Actividades del Mes", styles['Heading2']),
+            Spacer(1, 6),
+            t7,
+        ]))
+        elements.append(Spacer(1, 20))
+
+
 
         #Token firmado con datos del reporte
         
@@ -299,6 +333,20 @@ class MonthlyStatsApiView(APIView):
         pending   = queryset.filter(status='PENDING').count()
         cancelled = queryset.filter(status='CANCELLED').count()
 
+        # RF-18: el reporte tambien incluye actividades, asi que el chequeo de
+        # "hay algo que exportar" no debe depender solo de que existan citas.
+        date_from = request.query_params.get('date_from')
+        date_to   = request.query_params.get('date_to')
+        doctor_id = request.query_params.get('doctor_id')
+        activities_qs = Activity.objects.all()
+        if date_from:
+            activities_qs = activities_qs.filter(date__gte=date_from)
+        if date_to:
+            activities_qs = activities_qs.filter(date__lte=date_to)
+        if doctor_id:
+            activities_qs = activities_qs.filter(doctors__id=doctor_id)
+        total_activities = activities_qs.distinct().count()
+
         # Pacientes unicos que aparecen en las citas filtradas
         patient_ids = queryset.values_list('patient_id', flat=True).distinct()
         patients    = Patient.objects.filter(id__in=patient_ids)
@@ -328,6 +376,7 @@ class MonthlyStatsApiView(APIView):
 
         return Response({
             'total_appointments': total,
+            'total_activities': total_activities,
             'by_status': {'DONE': done, 'PENDING': pending, 'CANCELLED': cancelled},
             'unique_patients': patients.count(),
             'by_gender': gender_dist,
