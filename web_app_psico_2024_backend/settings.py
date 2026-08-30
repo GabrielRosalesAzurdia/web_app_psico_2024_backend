@@ -241,6 +241,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = _env_list('CORS_ALLOWED_ORIGINS', [
     'https://wellness-app-frontend.onrender.com',
+    # Vite en desarrollo local, para poder probar el frontend local contra
+    # el backend real de producción.
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
 ])
 
 CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS', [
