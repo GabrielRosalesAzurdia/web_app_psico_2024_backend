@@ -133,10 +133,12 @@ class DashboardMonthlyProgressApiView(APIView):
     def get(self, request):
         today = now().date()
 
-        # Citas por día del mes actual
+        # Citas cumplidas por día del mes actual (antes no filtraba por
+        # status: mezclaba pendientes/canceladas/cumplidas bajo el nombre
+        # "Cumplidas" del grafico del dashboard).
         daily = (
             Appointment.objects
-            .filter(date__year=today.year, date__month=today.month)
+            .filter(date__year=today.year, date__month=today.month, status='DONE', is_active=True)
             .annotate(day=TruncDay('date'))
             .values('day')
             .annotate(count=Count('id'))
@@ -145,6 +147,22 @@ class DashboardMonthlyProgressApiView(APIView):
         current_month = [
             {"date": str(entry['day']), "count": entry['count']}
             for entry in daily
+        ]
+
+        # Citas canceladas por día del mes actual (antes esta clave ni
+        # siquiera se enviaba: la linea "Canceladas" del grafico del
+        # dashboard quedaba siempre en cero).
+        daily_cancelled = (
+            Appointment.objects
+            .filter(date__year=today.year, date__month=today.month, status='CANCELLED', is_active=True)
+            .annotate(day=TruncDay('date'))
+            .values('day')
+            .annotate(count=Count('id'))
+            .order_by('day')
+        )
+        current_month_cancelled = [
+            {"date": str(entry['day']), "count": entry['count']}
+            for entry in daily_cancelled
         ]
 
         # Primer día de hace 2 meses para traer 3 meses en total
@@ -163,10 +181,11 @@ class DashboardMonthlyProgressApiView(APIView):
             ny += 1
         next_month_start = date_type(ny, nm, 1)
 
-        # Total de citas por mes los últimos 3 meses
+        # Total de citas cumplidas por mes los últimos 3 meses (mismo fix:
+        # antes contaba todas las citas sin importar el status).
         monthly = (
             Appointment.objects
-            .filter(date__gte=three_months_ago, date__lt=next_month_start)
+            .filter(date__gte=three_months_ago, date__lt=next_month_start, status='DONE', is_active=True)
             .annotate(month=TruncMonth('date'))
             .values('month')
             .annotate(total=Count('id'))
@@ -179,5 +198,6 @@ class DashboardMonthlyProgressApiView(APIView):
 
         return Response({
             "current_month": current_month,
+            "current_month_cancelled": current_month_cancelled,
             "monthly_comparison": monthly_comparison,
         })
