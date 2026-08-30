@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.request import Request
 from rest_framework.status import HTTP_201_CREATED
 from rest_framework.pagination import PageNumberPagination
-from django.db.models.functions import TruncDay, TruncMonth
+from django.db.models.functions import TruncDay
 from django.db.models import Count
 from datetime import date as date_type
 
@@ -133,38 +133,6 @@ class DashboardMonthlyProgressApiView(APIView):
     def get(self, request):
         today = now().date()
 
-        # Citas cumplidas por día del mes actual (antes no filtraba por
-        # status: mezclaba pendientes/canceladas/cumplidas bajo el nombre
-        # "Cumplidas" del grafico del dashboard).
-        daily = (
-            Appointment.objects
-            .filter(date__year=today.year, date__month=today.month, status='DONE', is_active=True)
-            .annotate(day=TruncDay('date'))
-            .values('day')
-            .annotate(count=Count('id'))
-            .order_by('day')
-        )
-        current_month = [
-            {"date": str(entry['day']), "count": entry['count']}
-            for entry in daily
-        ]
-
-        # Citas canceladas por día del mes actual (antes esta clave ni
-        # siquiera se enviaba: la linea "Canceladas" del grafico del
-        # dashboard quedaba siempre en cero).
-        daily_cancelled = (
-            Appointment.objects
-            .filter(date__year=today.year, date__month=today.month, status='CANCELLED', is_active=True)
-            .annotate(day=TruncDay('date'))
-            .values('day')
-            .annotate(count=Count('id'))
-            .order_by('day')
-        )
-        current_month_cancelled = [
-            {"date": str(entry['day']), "count": entry['count']}
-            for entry in daily_cancelled
-        ]
-
         # Primer día de hace 2 meses para traer 3 meses en total
         m = today.month - 2
         y = today.year
@@ -181,23 +149,42 @@ class DashboardMonthlyProgressApiView(APIView):
             ny += 1
         next_month_start = date_type(ny, nm, 1)
 
-        # Total de citas cumplidas por mes los últimos 3 meses (mismo fix:
-        # antes contaba todas las citas sin importar el status).
-        monthly = (
+        # Citas cumplidas por día, para los últimos 3 meses completos (antes
+        # solo traía el día a día del mes actual; los meses anteriores se
+        # repartían parejo entre las 4 semanas en el frontend -total/4-, sin
+        # reflejar en qué semana realmente hubo más o menos citas. También
+        # antes no filtraba por status: mezclaba pendientes/canceladas/
+        # cumplidas bajo el nombre "Cumplidas" del gráfico del dashboard).
+        daily = (
             Appointment.objects
             .filter(date__gte=three_months_ago, date__lt=next_month_start, status='DONE', is_active=True)
-            .annotate(month=TruncMonth('date'))
-            .values('month')
-            .annotate(total=Count('id'))
-            .order_by('month')
+            .annotate(day=TruncDay('date'))
+            .values('day')
+            .annotate(count=Count('id'))
+            .order_by('day')
         )
-        monthly_comparison = [
-            {"month": entry['month'].strftime('%Y-%m'), "total": entry['total']}
-            for entry in monthly
+        current_month = [
+            {"date": str(entry['day']), "count": entry['count']}
+            for entry in daily
+        ]
+
+        # Citas canceladas por día del mes actual (línea aparte del gráfico,
+        # no se compara entre meses). Antes esta clave ni siquiera se
+        # enviaba: la línea "Canceladas" del dashboard quedaba en cero.
+        daily_cancelled = (
+            Appointment.objects
+            .filter(date__year=today.year, date__month=today.month, status='CANCELLED', is_active=True)
+            .annotate(day=TruncDay('date'))
+            .values('day')
+            .annotate(count=Count('id'))
+            .order_by('day')
+        )
+        current_month_cancelled = [
+            {"date": str(entry['day']), "count": entry['count']}
+            for entry in daily_cancelled
         ]
 
         return Response({
             "current_month": current_month,
             "current_month_cancelled": current_month_cancelled,
-            "monthly_comparison": monthly_comparison,
         })
