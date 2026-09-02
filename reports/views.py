@@ -25,6 +25,15 @@ _DIAS_SEMANA = {1: 'Domingo', 2: 'Lunes', 3: 'Martes', 4: 'Miércoles', 5: 'Juev
 
 def _apply_filters(queryset, params):
     """Aplica filtros combinables al queryset de Appointment."""
+    # RF-19 (soft delete): una cita "eliminada" no se borra de la BD, solo
+    # queda con is_active=False. Los reportes y estadisticas NUNCA deben
+    # contar esas citas (falsearian totales, porcentajes y graficas), y aqui
+    # no hay opcion para incluirlas: el filtro va fijo. Como TODAS las vistas
+    # de reportes pasan su queryset por esta funcion, con esta sola linea
+    # quedan cubiertas MonthlyReportApiView, MonthlyStatsApiView y
+    # ScheduleStatsApiView.
+    queryset = queryset.filter(is_active=True)
+
     doctor_id     = params.get('doctor_id')
     doctor_name   = params.get('doctor_name')
     grade         = params.get('grade')
@@ -100,7 +109,10 @@ class MonthlyReportApiView(APIView):
 
         # Pacientes únicos del mes (sin nombres)
         patient_ids = appointments.values_list('patient_id', flat=True).distinct()
-        patients = Patient.objects.filter(id__in=patient_ids)
+        # RF-19: ademas de descartar citas inactivas (ya filtradas arriba),
+        # se descartan pacientes desactivados: is_active=True evita contarlos
+        # en las distribuciones por genero / edad / grado del reporte.
+        patients = Patient.objects.filter(id__in=patient_ids, is_active=True)
 
         # Género
         gender_dist = patients.values('gender').annotate(count=Count('id'))
@@ -358,7 +370,9 @@ class MonthlyStatsApiView(APIView):
 
         # Pacientes unicos que aparecen en las citas filtradas
         patient_ids = queryset.values_list('patient_id', flat=True).distinct()
-        patients    = Patient.objects.filter(id__in=patient_ids)
+        # RF-19: se excluyen los pacientes desactivados de las estadisticas
+        # (mismo motivo que en MonthlyReportApiView).
+        patients    = Patient.objects.filter(id__in=patient_ids, is_active=True)
 
         gender_dist = list(patients.values('gender').annotate(count=Count('id')).order_by('-count'))
         grade_dist  = list(patients.values('grade').annotate(count=Count('id')).order_by('-count'))

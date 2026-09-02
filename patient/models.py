@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from django.utils.timezone import now
-
+from django.db.models.functions import Lower
 
 class Patient(models.Model):
 
@@ -51,6 +51,18 @@ class Patient(models.Model):
         on_delete=models.PROTECT,
         related_name='patient'
     )
+    class Meta:
+        constraints = [
+            # RF-19: el nombre del paciente es unico en toda la tabla, sin
+            # importar mayus/minus ("Juan" y "juan" chocan). Lower('name')
+            # crea un indice unico sobre el nombre convertido a minusculas.
+            # Incluye a los pacientes desactivados (is_active=False), porque
+            # su fila sigue existiendo en la BD (soft delete).
+            models.UniqueConstraint(
+                Lower('name'),
+                name='unique_patient_name_ci',
+            ),
+        ]
 
     @staticmethod
     def calculate_age(birth_date, on_date=None):

@@ -23,15 +23,19 @@ class PatientSerializer(serializers.ModelSerializer):
         exclude = ['external_Id']
 
     def validate_name(self, value):
-        # RF-19: nombre unico en toda la base de datos al crear (incluye
-        # pacientes desactivados, ya que is_active no borra la fila). Solo
-        # aplica al crear: al editar, el paciente puede conservar su propio
-        # nombre sin chocar consigo mismo.
-        if self.instance is None:
-            if Patient.objects.filter(name__iexact=value.strip()).exists():
-                raise serializers.ValidationError(
-                    "Ya existe un paciente registrado con este nombre."
-                )
+        # RF-19: nombre unico (sin distinguir mayus/minus) en toda la BD,
+        # incluidos los pacientes desactivados (su fila sigue existiendo).
+        # Al EDITAR se excluye el propio paciente, para que pueda conservar
+        # su nombre sin "chocar" consigo mismo. Esto da un error 400 con
+        # mensaje claro; el UniqueConstraint del modelo es solo el respaldo
+        # a nivel de base de datos.
+        qs = Patient.objects.filter(name__iexact=value.strip())
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'Ya existe un paciente registrado con este nombre.'
+            )
         return value
 
     def validate(self, data):
