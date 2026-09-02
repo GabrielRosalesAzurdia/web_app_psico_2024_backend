@@ -27,7 +27,7 @@ class Patient(models.Model):
     grade = models.CharField(max_length=250, blank=True, default='')
     address = models.CharField(max_length=250, default='')
     tutor = models.CharField(max_length=250,default='')
-    managers_phone_number = models.CharField(max_length=250, default=' ')
+    managers_phone_number = models.CharField(max_length=250, blank=True, default=' ')
     place = models.CharField(
         max_length=50,
         choices=PlaceTypes.choices,
