@@ -1,8 +1,13 @@
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from django.contrib.auth import get_user_model
 from appointments.models import Appointment
-from appointments.serializers import AppointmentReadSerializer, AppointmentSerializer
+from appointments.serializers import (
+    AppointmentReadSerializer,
+    AppointmentSerializer,
+    DoctorSerializer,
+)
 from django.utils.timezone import now
 from rest_framework.response import Response
 from rest_framework.request import Request
@@ -26,9 +31,21 @@ class AppointmentCreateApiView(ListCreateAPIView):
     def get_queryset(self):
         queryset = Appointment.objects.all()
 
-        # RF-19: por defecto solo se listan citas activas; ?includeInactive=true
-        # (llega como include_inactive) trae tambien las desactivadas.
-        if self.request.query_params.get('include_inactive') != 'true':
+        # ---------------------------------------------------------------
+        # RF-19 (soft delete): "eliminar" una cita NO borra su fila (se
+        # perderia el historial y las estadisticas), solo pone
+        # is_active=False. Este bloque decide, segun la URL, que citas se
+        # devuelven. Los parametros llegan en camelCase desde el cliente
+        # (?onlyInactive=true) y el middleware camel-case los transforma a
+        # snake_case (only_inactive) antes de este punto.
+        #
+        #   ?onlyInactive=true    -> SOLO las citas desactivadas (papelera)
+        #   ?includeInactive=true -> activas + desactivadas (todas)
+        #   (sin parametro)       -> por defecto: SOLO las citas activas
+        # ---------------------------------------------------------------
+        if self.request.query_params.get('only_inactive') == 'true':
+            queryset = queryset.filter(is_active=False)
+        elif self.request.query_params.get('include_inactive') != 'true':
             queryset = queryset.filter(is_active=True)
 
         patient_id = self.request.query_params.get('patient')
@@ -80,6 +97,9 @@ class AppointmentCreateApiView(ListCreateAPIView):
         return Response(appointment_data, status=HTTP_201_CREATED)
 
 class AppointmentRetrieveApiView(RetrieveUpdateDestroyAPIView):
+    # RF-19: el detalle (GET/PUT/PATCH/DELETE /api/v1/appointment/<id>/) usa
+    # el queryset SIN filtrar por is_active a proposito: asi se puede abrir
+    # una cita desactivada y reactivarla (PATCH {"isActive": true}).
     queryset = Appointment.objects.all()
 
     def get_serializer_class(self):
@@ -89,31 +109,65 @@ class AppointmentRetrieveApiView(RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_destroy(self, instance):
-        # RF-19: no se elimina la fila (se perderia el historial); se
-        # desactiva, igual que Patient.
+        # RF-19: DELETE no borra la fila (se perderia el historial y las
+        # estadisticas). "Soft delete": se marca la cita como inactiva y
+        # deja de aparecer en los listados normales, pero sigue en la BD.
         instance.is_active = False
         instance.save()
-    
+
 class AppointmentGetPendingApiView(ListAPIView):
     serializer_class = AppointmentReadSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         today = now().date()
+        # RF-19: este listado (citas pendientes proximas) nunca debe mostrar
+        # citas desactivadas, por eso is_active=True va fijo y aqui no hay
+        # parametro para incluirlas.
         return Appointment.objects.filter(
             date__gte=today, status="PENDING", is_active=True
         ).order_by('date')
+
+class DoctorListApiView(ListAPIView):
+    # GET /api/v1/appointment/doctors/
+    #
+    # Alimenta el <select> de "psicologo" del formulario de citas: el
+    # campo Appointment.doctor es un FK a User, asi que un "psicologo
+    # asignable" no es mas que un usuario del sistema.
+    serializer_class = DoctorSerializer
+    permission_classes = [IsAuthenticated]
+
+    # Sin paginacion a proposito: el formulario necesita la lista
+    # completa de una sola vez para armar el combo (no se navega
+    # pagina por pagina).
+    pagination_class = None
+
+    def get_queryset(self):
+        # is_active=True   -> no ofrecer cuentas dadas de baja.
+        # is_superuser=False -> excluye al 'admin' del sistema, que no
+        #                       atiende pacientes y no debe aparecer
+        #                       como opcion asignable.
+        # Orden por nombre para que el combo salga alfabetico.
+        return get_user_model().objects.filter(
+            is_active=True, is_superuser=False
+        ).order_by('first_name', 'last_name')
+
+
 class AppointmentTodayApiView(ListAPIView):
     serializer_class = AppointmentReadSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # RF-19: agenda del dia; se excluyen siempre las citas desactivadas
+        # (is_active=True fijo, sin opcion de incluirlas).
         return Appointment.objects.filter(date=now().date(), is_active=True).order_by('hour')
 class DashboardTodayApiView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         today = now().date()
+        # RF-19: los contadores del dashboard solo cuentan citas activas;
+        # las desactivadas (soft delete) no deben inflar los totales.
         citas_hoy = Appointment.objects.filter(date=today, is_active=True)
 
         pendientes = citas_hoy.filter(status='PENDING')
@@ -155,6 +209,8 @@ class DashboardMonthlyProgressApiView(APIView):
         # reflejar en qué semana realmente hubo más o menos citas. También
         # antes no filtraba por status: mezclaba pendientes/canceladas/
         # cumplidas bajo el nombre "Cumplidas" del gráfico del dashboard).
+        # RF-19: is_active=True excluye del gráfico las citas desactivadas
+        # (soft delete); lo mismo aplica a "daily_cancelled" mas abajo.
         daily = (
             Appointment.objects
             .filter(date__gte=three_months_ago, date__lt=next_month_start, status='DONE', is_active=True)

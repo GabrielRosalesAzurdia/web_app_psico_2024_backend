@@ -8,6 +8,30 @@ from psico_auth.serializer import UserSerializer
 
 
 
+class DoctorSerializer(serializers.Serializer):
+    # Salida del endpoint GET /api/v1/appointment/doctors/.
+    #
+    # Serializa instancias de User (no hay modelo Psicologo: el campo
+    # Appointment.doctor apunta directo a User). Se expone solo lo que
+    # el formulario de citas necesita para pintar y enviar el <select>:
+    #   - id        -> value de cada <option> (lo que se manda al crear la cita)
+    #   - full_name -> texto visible de la opcion
+    # username / first_name / last_name / email van incluidos por si el
+    # front quiere mostrarlos, pero no son imprescindibles.
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    email = serializers.EmailField()
+    full_name = serializers.SerializerMethodField()
+
+    def get_full_name(self, obj):
+        # User.get_full_name() = "first_name last_name" ya recortado.
+        # Si el usuario no tiene nombre cargado, cae al username para no
+        # devolver una opcion con texto vacio.
+        return obj.get_full_name() or obj.username
+
+
 class AppointmentSerializer(serializers.ModelSerializer):
     # created_by = serializers.HiddenField(
     #     default=serializers.CurrentUserDefault()

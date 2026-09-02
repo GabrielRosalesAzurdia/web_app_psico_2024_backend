@@ -147,6 +147,27 @@ GET /api/v1/appointment/today/
 ```
 Returns all appointments scheduled for today, ordered by hour.
 
+### Assignable psychologists (appointment form)
+```
+GET /api/v1/appointment/doctors/
+```
+Returns the users that can be assigned as `doctor` when creating an appointment.
+Active users only, excludes the system `admin` (superuser), ordered by name.
+Not paginated — returns the full list for the `<select>`.
+
+```json
+[
+    {
+        "id": 1,
+        "username": "ana",
+        "firstName": "Ana",
+        "lastName": "Pérez",
+        "email": "ana@example.com",
+        "fullName": "Ana Pérez"
+    }
+]
+```
+
 ---
 
 ## Activity Endpoints `/api/v1/activity/`
