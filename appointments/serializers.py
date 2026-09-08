@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from django.utils.timezone import now
+from django.utils.timezone import localdate
 from appointments.models import Appointment
 
 from patient.serializers import PatientSerializer
@@ -51,7 +51,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
         if self.instance:
             status = status or self.instance.status
             date = date or self.instance.date
-        if date > now().date() and status == 'DONE':
+        # localdate() (no now().date()): ver appointments/views.py.
+        if date > localdate() and status == 'DONE':
             raise serializers.ValidationError({"status": "No se puede marcar como cumplida una cita futura"})        
         return data
 class AppointmentReadSerializer(AppointmentSerializer):

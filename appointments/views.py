@@ -8,7 +8,7 @@ from appointments.serializers import (
     AppointmentSerializer,
     DoctorSerializer,
 )
-from django.utils.timezone import now
+from django.utils.timezone import localdate
 from rest_framework.response import Response
 from rest_framework.request import Request
 from rest_framework.status import HTTP_201_CREATED
@@ -120,7 +120,10 @@ class AppointmentGetPendingApiView(ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        today = now().date()
+        # localdate() (no now().date()): now() es UTC y TIME_ZONE es
+        # America/Guatemala (UTC-6) - now().date() adelanta el dia varias
+        # horas antes de medianoche local.
+        today = localdate()
         # RF-19: este listado (citas pendientes proximas) nunca debe mostrar
         # citas desactivadas, por eso is_active=True va fijo y aqui no hay
         # parametro para incluirlas.
@@ -159,13 +162,14 @@ class AppointmentTodayApiView(ListAPIView):
 
     def get_queryset(self):
         # RF-19: agenda del dia; se excluyen siempre las citas desactivadas
-        # (is_active=True fijo, sin opcion de incluirlas).
-        return Appointment.objects.filter(date=now().date(), is_active=True).order_by('hour')
+        # (is_active=True fijo, sin opcion de incluirlas). localdate() en
+        # vez de now().date(): ver comentario en AppointmentGetPendingApiView.
+        return Appointment.objects.filter(date=localdate(), is_active=True).order_by('hour')
 class DashboardTodayApiView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        today = now().date()
+        today = localdate()
         # RF-19: los contadores del dashboard solo cuentan citas activas;
         # las desactivadas (soft delete) no deben inflar los totales.
         citas_hoy = Appointment.objects.filter(date=today, is_active=True)
@@ -185,7 +189,7 @@ class DashboardMonthlyProgressApiView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        today = now().date()
+        today = localdate()
 
         # Primer día de hace 2 meses para traer 3 meses en total
         m = today.month - 2

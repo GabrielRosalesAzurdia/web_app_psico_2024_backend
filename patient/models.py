@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
-from django.utils.timezone import now
+from django.utils.timezone import localdate
 from django.db.models.functions import Lower
 
 class Patient(models.Model):
@@ -66,7 +66,7 @@ class Patient(models.Model):
 
     @staticmethod
     def calculate_age(birth_date, on_date=None):
-        on_date = on_date or now().date()
+        on_date = on_date or localdate()
         years = on_date.year - birth_date.year
         had_birthday_this_year = (on_date.month, on_date.day) >= (birth_date.month, birth_date.day)
         if not had_birthday_this_year:

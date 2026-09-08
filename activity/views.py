@@ -2,7 +2,7 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.permissions import IsAuthenticated
 from activity.models import Activity
 from activity.serializers import ActivityReadSerializer, ActivitySerializer
-from django.utils.timezone import now
+from django.utils.timezone import localdate
 
 
 class ActivityCreateApiView(ListCreateAPIView):
@@ -46,7 +46,13 @@ class ActivityRetrieveApiView(RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     
 class ActivityGetPendingApiView(ListAPIView):
-    today = now().date()
-    queryset = Activity.objects.filter(date__gte=today, status="PENDING").order_by('date')
     serializer_class = ActivityReadSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Antes "today" era un atributo de clase evaluado una sola vez al
+        # importar el modulo (nunca se actualizaba dia a dia), y usaba
+        # now().date() en UTC en vez de la fecha local. localdate() calcula
+        # "hoy" en cada request y respeta TIME_ZONE=America/Guatemala.
+        today = localdate()
+        return Activity.objects.filter(date__gte=today, status="PENDING").order_by('date')

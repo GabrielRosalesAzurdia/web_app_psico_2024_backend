@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.http import HttpResponse
-from django.utils.timezone import now
+from django.utils.timezone import localdate
 from django.db.models import Count
 from django.db.models.functions import TruncMonth, ExtractWeekDay
 from io import BytesIO
@@ -79,7 +79,7 @@ class MonthlyReportApiView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        today = now().date()
+        today = localdate()
         year  = int(request.query_params.get('year', today.year))
         month = int(request.query_params.get('month', today.month))
 
