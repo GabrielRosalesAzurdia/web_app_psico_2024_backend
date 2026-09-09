@@ -1,0 +1,334 @@
+{
+  "info": {
+    "name": "Tulip - Validaciones de horario (citas y actividades)",
+    "description": "Pruebas del esquema de horario: bloques de 40 min 08:00-12:40 + hora libre.\n\nCasos cubiertos:\n- Cita con bloque -> 201, `hour` derivada del bloque\n- Cita con hora libre valida -> 201\n- Cita fuera de la jornada (08:00-13:20) -> 400\n- Cita con bloque + hora que no coincide -> 400\n- Cita sin bloque ni hora -> 400\n- Doble reserva (mismo psicologo/fecha/hora) -> 400\n- Actividad con bloque -> 201 (start 08:00 / end 08:40)\n- Actividad con horario libre valido -> 201\n- Actividad con fin <= inicio -> 400\n- Actividad fuera de la jornada -> 400\n\nAntes de correr: setea las variables `patient_id` y `doctor_id` (usa los requests de la carpeta 00 Setup). El Runner debe ejecutarse en orden.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://tulip-backend-7265.onrender.com/api/v1" },
+    { "key": "username", "value": "" },
+    { "key": "password", "value": "" },
+    { "key": "access_token", "value": "" },
+    { "key": "patient_id", "value": "" },
+    { "key": "doctor_id", "value": "" },
+    { "key": "future_date", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "00 Setup",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "const token = b.access || b.access_token || (b.data && b.data.access);",
+                  "pm.test('login 200', () => pm.response.code === 200);",
+                  "pm.test('devuelve access token', () => !!token);",
+                  "if (token) pm.collectionVariables.set('access_token', token);",
+                  "const d = new Date(); d.setDate(d.getDate() + 7);",
+                  "pm.collectionVariables.set('future_date', d.toISOString().slice(0, 10));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/login/", "host": ["{{base_url}}"], "path": ["auth", "login", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Listar psicologos (elegir doctor_id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.code === 200);",
+                  "const arr = pm.response.json();",
+                  "if (Array.isArray(arr) && arr.length && !pm.collectionVariables.get('doctor_id')) {",
+                  "  pm.collectionVariables.set('doctor_id', arr[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/appointment/doctors/", "host": ["{{base_url}}"], "path": ["appointment", "doctors", ""] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Citas - validaciones de horario",
+      "item": [
+        {
+          "name": "OK - cita con bloque (09:20)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.code === 201);",
+                  "const b = pm.response.json();",
+                  "pm.test('hour derivada del bloque = 09:20', () => String(b.hour).slice(0,5) === '09:20');",
+                  "pm.test('time_block persistido', () => b.time_block === '09:20');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/appointment/", "host": ["{{base_url}}"], "path": ["appointment", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {{patient_id}},\n  \"doctor\": {{doctor_id}},\n  \"time_block\": \"09:20\",\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "OK - cita hora libre (11:00)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.code === 201);",
+                  "const b = pm.response.json();",
+                  "pm.test('hour = 11:00', () => String(b.hour).slice(0,5) === '11:00');",
+                  "pm.test('sin time_block', () => !b.time_block);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/appointment/", "host": ["{{base_url}}"], "path": ["appointment", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {{patient_id}},\n  \"doctor\": {{doctor_id}},\n  \"hour\": \"11:00\",\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 - hora fuera de la jornada (20:00)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.code === 400);",
+                  "pm.test('error en hour', () => pm.response.json().hour !== undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/appointment/", "host": ["{{base_url}}"], "path": ["appointment", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {{patient_id}},\n  \"doctor\": {{doctor_id}},\n  \"hour\": \"20:00\",\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 - bloque + hora que no coincide",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.code === 400);",
+                  "pm.test('error en hour', () => pm.response.json().hour !== undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/appointment/", "host": ["{{base_url}}"], "path": ["appointment", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {{patient_id}},\n  \"doctor\": {{doctor_id}},\n  \"time_block\": \"08:00\",\n  \"hour\": \"10:00\",\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 - sin bloque ni hora",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.code === 400);",
+                  "pm.test('error en hour', () => pm.response.json().hour !== undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/appointment/", "host": ["{{base_url}}"], "path": ["appointment", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {{patient_id}},\n  \"doctor\": {{doctor_id}},\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 - doble reserva (mismo psicologo, 09:20)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.code === 400);",
+                  "pm.test('mensaje de choque de horario', () => JSON.stringify(pm.response.json()).toLowerCase().includes('horario'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/appointment/", "host": ["{{base_url}}"], "path": ["appointment", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {{patient_id}},\n  \"doctor\": {{doctor_id}},\n  \"time_block\": \"09:20\",\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Actividades - validaciones de horario",
+      "item": [
+        {
+          "name": "OK - actividad con bloque (08:00 -> 08:40)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.code === 201);",
+                  "const b = pm.response.json();",
+                  "pm.test('start = 08:00', () => String(b.start_hour).slice(0,5) === '08:00');",
+                  "pm.test('end = 08:40', () => String(b.end_hour).slice(0,5) === '08:40');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/activity/", "host": ["{{base_url}}"], "path": ["activity", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Prueba bloque\",\n  \"activity_type\": \"GRUPAL\",\n  \"doctors\": [{{doctor_id}}],\n  \"patients\": [],\n  \"time_block\": \"08:00\",\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "OK - actividad horario libre (09:00 -> 10:00)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.code === 201);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/activity/", "host": ["{{base_url}}"], "path": ["activity", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Prueba hora libre\",\n  \"activity_type\": \"GRUPAL\",\n  \"doctors\": [{{doctor_id}}],\n  \"patients\": [],\n  \"start_hour\": \"09:00\",\n  \"end_hour\": \"10:00\",\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 - fin <= inicio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.code === 400);",
+                  "pm.test('error en end_hour', () => pm.response.json().end_hour !== undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/activity/", "host": ["{{base_url}}"], "path": ["activity", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Prueba fin<=inicio\",\n  \"activity_type\": \"GRUPAL\",\n  \"doctors\": [{{doctor_id}}],\n  \"patients\": [],\n  \"start_hour\": \"10:00\",\n  \"end_hour\": \"09:00\",\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "400 - fuera de la jornada (start 07:00)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.code === 400);",
+                  "pm.test('error en start_hour', () => pm.response.json().start_hour !== undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/activity/", "host": ["{{base_url}}"], "path": ["activity", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Prueba fuera de jornada\",\n  \"activity_type\": \"GRUPAL\",\n  \"doctors\": [{{doctor_id}}],\n  \"patients\": [],\n  \"start_hour\": \"07:00\",\n  \"end_hour\": \"08:00\",\n  \"date\": \"{{future_date}}\",\n  \"place\": \"CDO\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
+from appointments.schedule import TimeBlock
+
 class Activity(models.Model):
     title = models.CharField(max_length=250, blank=False)
     description =models.TextField(max_length=250, blank=True, default="")
@@ -28,6 +30,14 @@ class Activity(models.Model):
     # filas ya existentes; el serializer la exige en cada creación/edición.
     start_hour = models.TimeField()
     end_hour = models.TimeField(null=True, blank=True)
+    # Bloque de 40min (08:00-12:40). Opcional: si queda vacio, el horario
+    # (start_hour/end_hour) es "hora libre" escrita a mano.
+    time_block = models.CharField(
+        max_length=5,
+        choices=TimeBlock.choices,
+        blank=True,
+        default='',
+    )
     date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

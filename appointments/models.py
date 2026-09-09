@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
+from appointments.schedule import TimeBlock
+
 class Appointment(models.Model):
 
     class StatusType(models.TextChoices):
@@ -37,6 +39,14 @@ class Appointment(models.Model):
         related_name='appointment'
     )
     hour = models.TimeField()
+    # Bloque de 40min (08:00-12:40). Opcional: si queda vacio, `hour` es
+    # una "hora libre" escrita a mano.
+    time_block = models.CharField(
+        max_length=5,
+        choices=TimeBlock.choices,
+        blank=True,
+        default='',
+    )
     date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

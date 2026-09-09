@@ -84,6 +84,7 @@ class AppointmentCreateApiView(ListCreateAPIView):
             'patient': request.data.get('patient'),
             'doctor': request.data.get('doctor'),
             'hour': request.data.get('hour'),
+            'time_block': request.data.get('time_block') or '',
             'date': request.data.get('date'),
             'status': request.data.get('status'),
             'place': request.data.get('place'),

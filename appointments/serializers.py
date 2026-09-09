@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.utils.timezone import localdate
 from appointments.models import Appointment
+from appointments.schedule import ScheduleError, resolve_hour
 
 from patient.serializers import PatientSerializer
 
@@ -40,9 +41,17 @@ class AppointmentSerializer(serializers.ModelSerializer):
     #goal = GoalSerializer(required=False)
 
 
+    # Opcional: si mandan `time_block`, la hora se deriva del bloque.
+    hour = serializers.TimeField(required=False)
+
     class Meta:
         model = Appointment
         fields = '__all__'
+
+    def _current(self, data, field):
+        if field in data:
+            return data[field]
+        return getattr(self.instance, field, None)
 
     def validate(self, data):
         status = data.get('status')
@@ -53,7 +62,29 @@ class AppointmentSerializer(serializers.ModelSerializer):
             date = date or self.instance.date
         # localdate() (no now().date()): ver appointments/views.py.
         if date > localdate() and status == 'DONE':
-            raise serializers.ValidationError({"status": "No se puede marcar como cumplida una cita futura"})        
+            raise serializers.ValidationError({"status": "No se puede marcar como cumplida una cita futura"})
+
+        # --- Validacion de horario (bloque de 40min u hora libre) ---
+        time_block = self._current(data, 'time_block')
+        hour = self._current(data, 'hour')
+        try:
+            data['hour'] = resolve_hour(time_block, hour)
+        except ScheduleError as exc:
+            raise serializers.ValidationError({exc.field: exc.message})
+
+        # Doble reserva: el mismo psicologo no puede tener dos citas
+        # vigentes a la misma fecha y hora.
+        doctor = self._current(data, 'doctor')
+        if doctor and date:
+            clash = Appointment.objects.filter(
+                doctor=doctor, date=date, hour=data['hour'], is_active=True
+            ).exclude(status=Appointment.StatusType.CANCELLED)
+            if self.instance:
+                clash = clash.exclude(pk=self.instance.pk)
+            if clash.exists():
+                raise serializers.ValidationError(
+                    {"hour": "El psicologo ya tiene una cita en ese horario."}
+                )
         return data
 class AppointmentReadSerializer(AppointmentSerializer):
     patient = PatientSerializer()

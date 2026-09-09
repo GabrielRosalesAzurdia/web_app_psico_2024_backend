@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from appointments.schedule import ScheduleError, resolve_activity_hours
 from activity.models import Activity
 from patient.models import Patient
 from patient.serializers import PatientSerializer
@@ -14,21 +15,29 @@ class ActivitySerializer(serializers.ModelSerializer):
         allow_empty=True
     )
 
+    # Opcional: si mandan `time_block`, el horario se deriva del bloque.
+    start_hour = serializers.TimeField(required=False)
+    end_hour = serializers.TimeField(required=False, allow_null=True)
+
     class Meta:
         model = Activity
         fields = '__all__'
 
     def validate(self, data):
-        start_hour = data.get('start_hour', getattr(self.instance, 'start_hour', None))
-        end_hour = data.get('end_hour', getattr(self.instance, 'end_hour', None))
-        if not end_hour:
-            raise serializers.ValidationError(
-                {"end_hour": "La hora de fin es obligatoria."}
+        def current(field):
+            if field in data:
+                return data[field]
+            return getattr(self.instance, field, None)
+
+        time_block = current('time_block')
+        try:
+            start, end = resolve_activity_hours(
+                time_block, current('start_hour'), current('end_hour')
             )
-        if start_hour and end_hour <= start_hour:
-            raise serializers.ValidationError(
-                {"end_hour": "La hora de fin debe ser posterior a la hora de inicio."}
-            )
+        except ScheduleError as exc:
+            raise serializers.ValidationError({exc.field: exc.message})
+        data['start_hour'] = start
+        data['end_hour'] = end
         return data
 
 
