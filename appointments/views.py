@@ -15,6 +15,8 @@ from rest_framework.status import HTTP_201_CREATED
 from rest_framework.pagination import PageNumberPagination
 from django.db.models.functions import TruncDay
 from django.db.models import Count
+from datetime import datetime, timedelta
+from django.utils.timezone import localtime, get_current_timezone
 from datetime import date as date_type
 
 class AppointmentPagination(PageNumberPagination):
@@ -249,3 +251,49 @@ class DashboardMonthlyProgressApiView(APIView):
             "current_month": current_month,
             "current_month_cancelled": current_month_cancelled,
         })
+
+
+class AppointmentRemindersApiView(ListAPIView):
+    # GET /api/v1/appointment/reminders/
+    #
+    # Devuelve las citas que empiezan dentro de los proximos N minutos
+    # (por defecto 30), para disparar recordatorios. Solo citas vigentes
+    # (is_active=True) y pendientes (status=PENDING): una cita ya cumplida
+    # o cancelada no necesita recordatorio.
+    #
+    # ?within=30  -> ventana en minutos hacia adelante (opcional, default 30)
+    serializer_class = AppointmentReadSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        # "Ahora" en hora local (America/Guatemala); localtime() respeta
+        # TIME_ZONE, a diferencia de datetime.now() que da UTC.
+        now = localtime()
+        try:
+            within = int(self.request.query_params.get('within', 30))
+        except (TypeError, ValueError):
+            within = 30
+        limite = now + timedelta(minutes=within)
+
+        # Se filtra primero por fecha en la BD (rapido, usa indice) y luego
+        # se compara la hora exacta en Python: Appointment guarda date y
+        # hour por separado, no un datetime, asi que no se puede comparar
+        # el instante completo directo en el ORM.
+        tz = get_current_timezone()
+        candidatas = Appointment.objects.filter(
+            date__gte=now.date(),
+            date__lte=limite.date(),
+            status='PENDING',
+            is_active=True,
+        ).order_by('date', 'hour')
+
+        proximas = []
+        for cita in candidatas:
+            inicio = datetime.combine(cita.date, cita.hour, tzinfo=tz)
+            # Entre ahora y el limite: la cita aun no empieza pero empieza
+            # dentro de la ventana.
+            if now <= inicio <= limite:
+                proximas.append(cita.pk)
+
+        return candidatas.filter(pk__in=proximas)

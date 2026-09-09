@@ -7,6 +7,7 @@ from appointments.views import (
     AppointmentTodayApiView,
     DashboardTodayApiView,
     DoctorListApiView,
+    AppointmentRemindersApiView,
 )
 
 urlpatterns = [
@@ -22,6 +23,9 @@ urlpatterns = [
     path('pending/',
          AppointmentGetPendingApiView.as_view(),
          name='appointment-pending'),
+    path('reminders/',
+         AppointmentRemindersApiView.as_view(),
+         name='appointment-reminders'),
     path('<int:pk>/',
          AppointmentRetrieveApiView.as_view(), name='appointment-detail'),
     path('today/',

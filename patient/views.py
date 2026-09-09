@@ -4,7 +4,8 @@ from rest_framework.permissions import IsAuthenticated
 from patient.models import Patient
 from patient.serializers import PatientSerializer
 from rest_framework import filters
-
+from rest_framework.views import APIView
+from rest_framework.response import Response
 
 def _active_unless_requested(queryset, query_params):
     """RF-19 (soft delete): "eliminar" un paciente NO borra su fila de la base
@@ -69,3 +70,53 @@ class PatientListApiView(ListAPIView):
         # pacientes desactivados salvo ?includeInactive / ?onlyInactive.
         return _active_unless_requested(Patient.objects.all(), self.request.query_params)
 
+class PatientIncompleteFieldsApiView(APIView):
+    # GET /api/v1/patient/incomplete/
+    #
+    # Detecta pacientes activos con campos clave sin llenar y los expone
+    # como lista de "notificaciones" para que el frontend avise que la
+    # ficha esta incompleta. Solo pacientes vigentes (is_active=True).
+    permission_classes = [IsAuthenticated]
+
+    # Campos que se consideran obligatorios para una ficha "completa".
+    # (label -> como se muestra en la notificacion)
+    CAMPOS_REQUERIDOS = {
+        'phone': 'Telefono',
+        'birth_date': 'Fecha de nacimiento',
+        'gender': 'Genero',
+        'grade': 'Grado',
+        'address': 'Direccion',
+        'tutor': 'Encargado',
+        'managers_phone_number': 'Telefono del encargado',
+    }
+
+    def _falta(self, valor):
+        # Vacio real: None, cadena vacia o solo espacios (varios campos
+        # tienen default=' ' o default='0').
+        if valor is None:
+            return True
+        texto = str(valor).strip()
+        return texto in ('', '0')
+
+    def get(self, request):
+        pacientes = Patient.objects.filter(is_active=True).order_by('name')
+
+        incompletos = []
+        for p in pacientes:
+            faltantes = [
+                label
+                for campo, label in self.CAMPOS_REQUERIDOS.items()
+                if self._falta(getattr(p, campo))
+            ]
+            if faltantes:
+                incompletos.append({
+                    'id': p.id,
+                    'name': p.name,
+                    'missing_fields': faltantes,
+                    'missing_count': len(faltantes),
+                })
+
+        return Response({
+            'total': len(incompletos),
+            'patients': incompletos,
+        })
