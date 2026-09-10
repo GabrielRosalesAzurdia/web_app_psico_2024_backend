@@ -42,7 +42,11 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
 
     # Opcional: si mandan `time_block`, la hora se deriva del bloque.
-    hour = serializers.TimeField(required=False)
+    # allow_null=True: AppointmentCreateApiView.post() arma el dict con
+    # request.data.get('hour') (None explicito cuando no se manda, no
+    # ausente), asi que sin allow_null el campo rechazaba "None" antes de
+    # que validate()/resolve_hour() llegara a derivarla del bloque.
+    hour = serializers.TimeField(required=False, allow_null=True)
 
     class Meta:
         model = Appointment

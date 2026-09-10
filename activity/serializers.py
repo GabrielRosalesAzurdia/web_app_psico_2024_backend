@@ -16,7 +16,11 @@ class ActivitySerializer(serializers.ModelSerializer):
     )
 
     # Opcional: si mandan `time_block`, el horario se deriva del bloque.
-    start_hour = serializers.TimeField(required=False)
+    # allow_null=True en ambas (antes solo end_hour la tenia): igual que en
+    # AppointmentSerializer, si el cliente manda explicitamente null (en
+    # vez de omitir la clave) el campo no debe rechazarlo antes de que
+    # validate()/resolve_activity_hours() la derive del bloque.
+    start_hour = serializers.TimeField(required=False, allow_null=True)
     end_hour = serializers.TimeField(required=False, allow_null=True)
 
     class Meta:

@@ -1,8 +1,11 @@
 """Esquema de horario compartido por Appointment y Activity.
 
-La jornada se divide en bloques de 40 minutos desde las 08:00 hasta las
-12:40. Ademas de esos bloques fijos, se admite "hora libre": el usuario
-escribe cualquier hora a mano en el TimeField y deja `time_block` vacio.
+Se ofrecen bloques de 40 minutos desde las 08:00 hasta las 12:40 como
+sugerencia (RF-21: "horario escolar"). Ademas de esos bloques fijos, se
+admite "hora libre": el usuario escribe cualquier hora a mano en el
+TimeField y deja `time_block` vacio - sin acotarla a una franja horaria,
+ya que la practica atiende tambien fuera de la manana (RF-19/RF-23: un
+paciente puede llegar sin cita agendada a cualquier hora del dia).
 """
 from datetime import date as date_cls, datetime, time, timedelta
 
@@ -10,11 +13,6 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 BLOCK_MINUTES = 40
-
-# La jornada de atencion: primer bloque inicia 08:00, el ultimo (12:40)
-# termina 13:20. Toda hora (bloque u hora libre) debe caer en este rango.
-DAY_START = time(8, 0)
-DAY_END = time(13, 20)
 
 
 class TimeBlock(models.TextChoices):
@@ -50,10 +48,6 @@ def block_end(value):
             + timedelta(minutes=BLOCK_MINUTES)).time()
 
 
-def in_working_day(hour):
-    return DAY_START <= hour <= DAY_END
-
-
 class ScheduleError(ValueError):
     """Error de validacion de horario; el campo afectado va en `field`."""
 
@@ -68,8 +62,9 @@ def resolve_hour(time_block, hour):
 
     - Con bloque: la hora se deriva del bloque; si ademas mandan `hour`
       y no coincide, es un error.
-    - Sin bloque (hora libre): `hour` es obligatoria.
-    En ambos casos la hora debe caer dentro de la jornada.
+    - Sin bloque (hora libre): `hour` es obligatoria, sin mas restriccion
+      (RF-21: "amplios y moldeables" - la practica atiende a cualquier
+      hora del dia, no solo en la manana).
     Devuelve la hora final (datetime.time).
     """
     if time_block:
@@ -85,11 +80,6 @@ def resolve_hour(time_block, hour):
 
     if hour is None:
         raise ScheduleError('hour', 'Indique un bloque o una hora libre.')
-    if not in_working_day(hour):
-        raise ScheduleError(
-            'hour',
-            f'La hora debe estar entre {DAY_START:%H:%M} y {DAY_END:%H:%M}.',
-        )
     return hour
 
 
@@ -97,7 +87,8 @@ def resolve_activity_hours(time_block, start_hour, end_hour):
     """Igual que resolve_hour pero para actividades (inicio + fin).
 
     Con bloque: start = inicio del bloque, end = fin del bloque.
-    Sin bloque: se exigen ambas, dentro de la jornada y end > start.
+    Sin bloque: se exigen ambas y end > start (sin acotar a una franja
+    horaria - mismo motivo que resolve_hour).
     Devuelve (start_hour, end_hour).
     """
     if time_block:
@@ -111,10 +102,4 @@ def resolve_activity_hours(time_block, start_hour, end_hour):
         raise ScheduleError(
             'end_hour', 'La hora de fin debe ser posterior a la hora de inicio.'
         )
-    for field, value in (('start_hour', start_hour), ('end_hour', end_hour)):
-        if not in_working_day(value):
-            raise ScheduleError(
-                field,
-                f'El horario debe estar entre {DAY_START:%H:%M} y {DAY_END:%H:%M}.',
-            )
     return start_hour, end_hour
