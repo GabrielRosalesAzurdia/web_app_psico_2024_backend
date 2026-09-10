@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'profiles.apps.ProfilesConfig',
     'patient.apps.PatientConfig',
     'appointments.apps.AppointmentsConfig',
+    'express_appointment.apps.ExpressAppointmentConfig',
     'activity.apps.ActivityConfig',
     'note.apps.NoteConfig',
     'reports',

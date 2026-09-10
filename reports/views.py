@@ -11,6 +11,7 @@ from PIL import Image as PILImage
 from reportlab.platypus import Image as RLImage
 from reportlab.lib.units import cm
 from appointments.models import Appointment
+from express_appointment.models import ExpressAppointment
 from activity.models import Activity
 from patient.models import Patient
 from django.core import signing
@@ -102,6 +103,15 @@ class MonthlyReportApiView(APIView):
         activities = activities.distinct()
         total_activities = activities.count()
 
+        # Citas express del mes (RF nueva: tabla propia en el reporte).
+        # is_active=True fijo, mismo criterio de soft delete que _apply_filters.
+        express = ExpressAppointment.objects.filter(
+            date__year=year, date__month=month, is_active=True
+        )
+        if doctor_id:
+            express = express.filter(doctor_id=doctor_id)
+        total_express = express.count()
+
         # Asistencia
         done      = appointments.filter(status='DONE').count()
         pending   = appointments.filter(status='PENDING').count()
@@ -152,7 +162,9 @@ class MonthlyReportApiView(APIView):
         elements.append(Paragraph("Daniel Padnos Wellness Center", title_style))
         elements.append(Paragraph(f"Reporte Mensual — {month_name} {year}", title_style))
         elements.append(Paragraph(
-            f"Generado: {today}  |  Total de citas: {total}  |  Total de actividades: {total_activities}",
+            f"Generado: {today}  |  Total de citas: {total}  |  "
+            f"Total de citas express: {total_express}  |  "
+            f"Total de actividades: {total_activities}",
             sub_style
         ))
 
@@ -282,14 +294,40 @@ class MonthlyReportApiView(APIView):
         ]))
         elements.append(Spacer(1, 20))
 
+        # Sección 8: Citas express del mes (tabla propia, anonimizada igual
+        # que la sección 6). Un paciente que solo tuvo cita express no
+        # aparece en patient_map todavía, se agrega aquí.
+        for pid in express.values_list('patient_id', flat=True).distinct():
+            if pid not in patient_map:
+                patient_map[pid] = f"Paciente {counter}"
+                counter += 1
 
+        express_data = [['Identificador', 'Fecha', 'Hora', 'Lugar']]
+        for cita in express.order_by('date', 'hour'):
+            express_data.append([
+                patient_map.get(cita.patient_id, '-'),
+                str(cita.date),
+                str(cita.hour),
+                cita.place,
+            ])
+        if len(express_data) == 1:
+            express_data.append(['Sin citas express registradas este mes.', '', '', ''])
+        t8 = Table(express_data, colWidths=[3*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+        t8.setStyle(table_style)
+        elements.append(KeepTogether([
+            Paragraph("8. Citas Express del Mes", styles['Heading2']),
+            Spacer(1, 6),
+            t8,
+        ]))
+        elements.append(Spacer(1, 20))
 
         #Token firmado con datos del reporte
-        
+
         token_data ={
             'year':year,
             'month':month,
             'total': total,
+            'total_express': total_express,
             'generated': str(today),
         }
         token = signing.dumps(token_data)
@@ -332,6 +370,7 @@ class ReportVerifyApiView(APIView):
                 'year':data['year'],
                 'month':data['month'],
                 'total_appoinments':data['total'],
+                'total_express': data.get('total_express', 0),
                 'generated': data["generated"],
                 
             })

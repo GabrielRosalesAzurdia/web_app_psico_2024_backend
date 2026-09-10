@@ -30,6 +30,7 @@ urlpatterns = [
     path('api/v1/auth/', include('psico_auth.urls')),
     path('api/v1/patient/', include('patient.urls')),
     path('api/v1/appointment/', include('appointments.urls')),
+    path('api/v1/express-appointment/', include('express_appointment.urls')),
     path('api/v1/dashboard/today/', DashboardTodayApiView.as_view(), name='dashboard-today'),
     path('api/v1/dashboard/monthly-progress/', DashboardMonthlyProgressApiView.as_view(), name='dashboard-monthly'),
     path('api/v1/activity/', include('activity.urls')),
