@@ -80,3 +80,29 @@ class Patient(models.Model):
 
     def __str__(self):
         return f'{self.name} - {self.phone} - {self.age}'
+
+
+class PatientNote(models.Model):
+    # RF-26: notas y observaciones generales del expediente clinico, no
+    # atadas a una cita puntual (a diferencia del campo `notes` de
+    # Appointment, que son las observaciones de ESA cita). Tampoco es RF-24
+    # (el tablon compartido tipo post-it entre psicologos): esto es
+    # contenido clinico del paciente, y cae bajo RNF-02 (solo profesional
+    # autenticado, igual que el resto de la API).
+    #
+    # Acumulativas y no se sobrescriben: no hay UPDATE, solo se agregan.
+    # Por eso no hay campo "updated_at" ni endpoint de edicion.
+    patient = models.ForeignKey(
+        Patient, related_name='clinical_notes', on_delete=models.CASCADE)
+    author = models.ForeignKey(
+        get_user_model(), related_name='patient_notes', on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # Orden cronologico inverso (la mas reciente primero), como pide
+        # el criterio de aceptacion.
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Nota de {self.patient.name} por {self.author.username} ({self.created_at:%Y-%m-%d %H:%M})'

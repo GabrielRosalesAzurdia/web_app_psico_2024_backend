@@ -6,6 +6,7 @@ from patient.views import (
     PatientRetrieveApiView,
     PatientListApiView,
     PatientIncompleteFieldsApiView,
+    PatientNoteListCreateApiView,
 )
 
 urlpatterns = [
@@ -14,6 +15,8 @@ urlpatterns = [
          name='patient-create'),
     path('<int:pk>/',
          PatientRetrieveApiView.as_view(), name='patient-detail'),
+    path('<int:patient_id>/notes/',
+         PatientNoteListCreateApiView.as_view(), name='patient-notes'),
     path('list/', PatientListApiView.as_view(), name='patient-list'),
     path('incomplete/',
          PatientIncompleteFieldsApiView.as_view(),

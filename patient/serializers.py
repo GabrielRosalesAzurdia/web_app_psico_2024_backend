@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from patient.models import Patient
+from patient.models import Patient, PatientNote
 
 class PatientSerializer(serializers.ModelSerializer):
     created_by = serializers.HiddenField(
@@ -52,3 +52,22 @@ class PatientSerializer(serializers.ModelSerializer):
         if instance.birth_date:
             data['age'] = Patient.calculate_age(instance.birth_date)
         return data
+
+
+class PatientNoteSerializer(serializers.ModelSerializer):
+    # Igual que en note/serializers.py (RF-24) y DoctorSerializer: nombre
+    # para mostrar ya resuelto por el backend, el frontend no arma nombres.
+    author_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PatientNote
+        fields = ['id', 'content', 'author_name', 'created_at']
+        read_only_fields = ['id', 'author_name', 'created_at']
+
+    def get_author_name(self, obj):
+        return obj.author.get_full_name() or obj.author.username
+
+    def validate_content(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('La nota no puede estar vacía.')
+        return value

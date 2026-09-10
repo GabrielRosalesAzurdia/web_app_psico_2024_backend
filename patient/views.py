@@ -1,8 +1,9 @@
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
-from patient.models import Patient
-from patient.serializers import PatientSerializer
+from rest_framework.generics import get_object_or_404
+from patient.models import Patient, PatientNote
+from patient.serializers import PatientSerializer, PatientNoteSerializer
 from rest_framework import filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -120,3 +121,23 @@ class PatientIncompleteFieldsApiView(APIView):
             'total': len(incompletos),
             'patients': incompletos,
         })
+
+
+class PatientNoteListCreateApiView(ListCreateAPIView):
+    # GET/POST /api/v1/patient/<patient_id>/notes/
+    #
+    # RF-26: notas clinicas del expediente, independientes de una cita.
+    # No hay bloqueo por consentimiento todavia (RF-33 no existe en el
+    # sistema); cuando exista, va aca en get_queryset/perform_create.
+    serializer_class = PatientNoteSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        return PatientNote.objects.filter(
+            patient_id=self.kwargs['patient_id']
+        ).select_related('author')
+
+    def perform_create(self, serializer):
+        patient = get_object_or_404(Patient, pk=self.kwargs['patient_id'])
+        serializer.save(patient=patient, author=self.request.user)
