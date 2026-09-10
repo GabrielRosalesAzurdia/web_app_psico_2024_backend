@@ -1,5 +1,5 @@
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView
+from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView, DestroyAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import get_object_or_404
 from patient.models import Patient, PatientNote
@@ -141,3 +141,23 @@ class PatientNoteListCreateApiView(ListCreateAPIView):
     def perform_create(self, serializer):
         patient = get_object_or_404(Patient, pk=self.kwargs['patient_id'])
         serializer.save(patient=patient, author=self.request.user)
+
+
+class IsPatientNoteAuthor(BasePermission):
+    # Igual que IsNoteAuthor en note/views.py (RF-24): se deja que se
+    # encuentre el objeto y se responda 403, en vez de filtrar el queryset
+    # (que daria 404 en una nota ajena).
+    message = 'Solo quien escribio la nota puede borrarla.'
+
+    def has_object_permission(self, request, view, obj):
+        return obj.author_id == request.user.id
+
+
+class PatientNoteDestroyApiView(DestroyAPIView):
+    # DELETE /api/v1/patient/<patient_id>/notes/<pk>/ -> 204 sin cuerpo;
+    # 403 si no sos el autor. No estaba en el alcance original de RF-26
+    # ("acumulativas, no se borran"), pero hace falta para poder limpiar
+    # una nota cargada por error sin dejarla para siempre en el expediente.
+    serializer_class = PatientNoteSerializer
+    permission_classes = [IsAuthenticated, IsPatientNoteAuthor]
+    queryset = PatientNote.objects.all()
