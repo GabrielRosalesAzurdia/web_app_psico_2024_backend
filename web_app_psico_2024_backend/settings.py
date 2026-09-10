@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'patient.apps.PatientConfig',
     'appointments.apps.AppointmentsConfig',
     'activity.apps.ActivityConfig',
+    'note.apps.NoteConfig',
     'reports',
 
     'django.contrib.sites',
