@@ -4,9 +4,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import get_object_or_404
 from patient.models import Patient, PatientNote
 from patient.serializers import PatientSerializer, PatientNoteSerializer
+from appointments.models import Appointment
+from appointments.serializers import AppointmentReadSerializer
+from psico_auth.serializer import UserSerializer
 from rest_framework import filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
+
 
 def _active_unless_requested(queryset, query_params):
     """RF-19 (soft delete): "eliminar" un paciente NO borra su fila de la base
@@ -161,3 +165,45 @@ class PatientNoteDestroyApiView(DestroyAPIView):
     serializer_class = PatientNoteSerializer
     permission_classes = [IsAuthenticated, IsPatientNoteAuthor]
     queryset = PatientNote.objects.all()
+
+class PatientFileApiView(APIView):
+    # GET /api/v1/patient/<patient_id>/file/
+    #
+    # Ficha unica del paciente: junta en una sola respuesta sus datos
+    # generales, sus notas clinicas, su historial de citas y su psicologo
+    # asignado, para que el frontend no tenga que pedir cada seccion por
+    # separado.
+    #
+    # Esto solo LEE de PatientNote (lo clinico) y Appointment (la agenda),
+    # que ya son modelos y apps separados. Si mas adelante hace falta dar
+    # acceso a una seccion sin dar acceso a la otra (por ejemplo, alguien
+    # que ve la agenda pero no las notas clinicas), es este metodo el que
+    # hay que tocar para armar el dict de forma condicional segun el rol.
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, patient_id):
+        patient = get_object_or_404(Patient, pk=patient_id)
+
+        notes = patient.clinical_notes.select_related('author')
+
+        appointments = Appointment.objects.filter(
+            patient=patient, is_active=True
+        ).select_related('doctor').order_by('-date', '-hour')
+
+        # RF-31: no existe un campo "psicologo asignado" en Patient (un
+        # paciente puede pasar de psicologo entre citas). Se toma el
+        # doctor de la cita mas reciente como el responsable actual.
+        latest_appointment = appointments.first()
+        assigned_psychologist = (
+            latest_appointment.doctor if latest_appointment else None
+        )
+
+        return Response({
+            'general': PatientSerializer(patient).data,
+            'clinical_notes': PatientNoteSerializer(notes, many=True).data,
+            'appointment_history': AppointmentReadSerializer(appointments, many=True).data,
+            'assigned_psychologist': (
+                UserSerializer(assigned_psychologist).data
+                if assigned_psychologist else None
+            ),
+        })
