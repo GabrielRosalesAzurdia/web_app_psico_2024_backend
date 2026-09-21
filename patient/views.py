@@ -1,5 +1,7 @@
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView, DestroyAPIView
+from rest_framework.mixins import UpdateModelMixin
+from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import get_object_or_404
 from patient.models import Patient, PatientNote
@@ -139,7 +141,7 @@ class PatientNoteListCreateApiView(ListCreateAPIView):
 
     def get_queryset(self):
         return PatientNote.objects.filter(
-            patient_id=self.kwargs['patient_id']
+            patient_id=self.kwargs['patient_id'], is_active=True
         ).select_related('author')
 
     def perform_create(self, serializer):
@@ -157,7 +159,7 @@ class IsPatientNoteAuthor(BasePermission):
         return obj.author_id == request.user.id
 
 
-class PatientNoteDestroyApiView(DestroyAPIView):
+class PatientNoteDetailApiView(UpdateModelMixin,DestroyAPIView ):
     # DELETE /api/v1/patient/<patient_id>/notes/<pk>/ -> 204 sin cuerpo;
     # 403 si no sos el autor. No estaba en el alcance original de RF-26
     # ("acumulativas, no se borran"), pero hace falta para poder limpiar
@@ -165,7 +167,15 @@ class PatientNoteDestroyApiView(DestroyAPIView):
     serializer_class = PatientNoteSerializer
     permission_classes = [IsAuthenticated, IsPatientNoteAuthor]
     queryset = PatientNote.objects.all()
-
+    def patch(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+    
+    def perform_update(self, serializer):
+        serializer.save(edited_by =self.request.user, edited_at=timezone.now())
+        
+    def perform_destroy(self, instance):
+        instance.is_active = False
+        instance.save()
 class PatientFileApiView(APIView):
     # GET /api/v1/patient/<patient_id>/file/
     #
@@ -184,7 +194,7 @@ class PatientFileApiView(APIView):
     def get(self, request, patient_id):
         patient = get_object_or_404(Patient, pk=patient_id)
 
-        notes = patient.clinical_notes.select_related('author')
+        notes = patient.clinical_notes.filter(is_active=True).select_related('author')
 
         appointments = Appointment.objects.filter(
             patient=patient, is_active=True

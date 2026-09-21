@@ -58,14 +58,20 @@ class PatientNoteSerializer(serializers.ModelSerializer):
     # Igual que en note/serializers.py (RF-24) y DoctorSerializer: nombre
     # para mostrar ya resuelto por el backend, el frontend no arma nombres.
     author_name = serializers.SerializerMethodField()
+    edited_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = PatientNote
-        fields = ['id', 'content', 'author_name', 'created_at']
-        read_only_fields = ['id', 'author_name', 'created_at']
+        fields = ['id', 'content', 'author_name', 'created_at', 'edited_by_name', 'edited_at']
+        read_only_fields = ['id', 'author_name', 'created_at', 'edited_by_name', 'edited_at']
 
     def get_author_name(self, obj):
         return obj.author.get_full_name() or obj.author.username
+
+    def get_edited_by_name(self, obj):
+        if not obj.edited_by:
+            return None
+        return obj.edited_by.get_full_name() or obj.edited_by.username
 
     def validate_content(self, value):
         if not value.strip():

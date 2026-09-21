@@ -7,7 +7,7 @@ from patient.views import (
     PatientListApiView,
     PatientIncompleteFieldsApiView,
     PatientNoteListCreateApiView,
-    PatientNoteDestroyApiView,
+    PatientNoteDetailApiView,
     PatientFileApiView,
 )
 
@@ -20,7 +20,7 @@ urlpatterns = [
     path('<int:patient_id>/notes/',
          PatientNoteListCreateApiView.as_view(), name='patient-notes'),
     path('<int:patient_id>/notes/<int:pk>/',
-         PatientNoteDestroyApiView.as_view(), name='patient-note-destroy'),
+         PatientNoteDetailApiView.as_view(), name='patient-note-destroy'),
     path('<int:patient_id>/file/',
          PatientFileApiView.as_view(), name='patient-file'),
     path('list/', PatientListApiView.as_view(), name='patient-list'),
