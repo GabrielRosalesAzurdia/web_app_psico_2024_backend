@@ -102,6 +102,8 @@ class PatientNote(models.Model):
     is_active = models.BooleanField(default=True)
     annulled_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+
 
     class Meta:
         # Orden cronologico inverso (la mas reciente primero), como pide
