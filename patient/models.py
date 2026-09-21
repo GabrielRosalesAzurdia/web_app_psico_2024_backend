@@ -89,7 +89,6 @@ class PatientNote(models.Model):
     # (el tablon compartido tipo post-it entre psicologos): esto es
     # contenido clinico del paciente, y cae bajo RNF-02 (solo profesional
     # autenticado, igual que el resto de la API).
-    #
     # Acumulativas y no se sobrescriben: no hay UPDATE, solo se agregan.
     # Por eso no hay campo "updated_at" ni endpoint de edicion.
     patient = models.ForeignKey(
@@ -97,6 +96,11 @@ class PatientNote(models.Model):
     author = models.ForeignKey(
         get_user_model(), related_name='patient_notes', on_delete=models.CASCADE)
     content = models.TextField()
+    edited_by = models.ForeignKey(
+        get_user_model(), null=True, blank=True,
+        related_name='edited_patient_notes', on_delete=models.SET_NULL)
+    is_active = models.BooleanField(default=True)
+    annulled_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
