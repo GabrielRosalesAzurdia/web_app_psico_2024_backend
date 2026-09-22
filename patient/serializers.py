@@ -1,11 +1,12 @@
 from rest_framework import serializers
-from patient.models import Patient, PatientNote
+from patient.models import Patient, PatientNote, CaseReassignment
 
 class PatientSerializer(serializers.ModelSerializer):
     created_by = serializers.HiddenField(
         default=serializers.CurrentUserDefault()
     )
     id = serializers.IntegerField(read_only=True)
+    assigned_psychologist = serializers.PrimaryKeyRelatedField(read_only=True)
     age = serializers.IntegerField(required=False)
     # external_Id no es snake_case ni camelCase puro (tiene una "I" mayúscula
     # a mitad de palabra), así que djangorestframework-camel-case nunca
@@ -77,3 +78,26 @@ class PatientNoteSerializer(serializers.ModelSerializer):
         if not value.strip():
             raise serializers.ValidationError('La nota no puede estar vacía.')
         return value
+class CaseReassignmentSerializer(serializers.ModelSerializer):
+    previous_psychologist_name = serializers.SerializerMethodField()
+    new_psychologist_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CaseReassignment
+        fields = [
+            'id','previous_psychologist_name', 'new_psychologist_name',
+            'reason', 'created_by_name', 'created_at',
+        ]
+        read_only_fields=fields
+    
+    def get_previous_psychologist_name(self, obj):
+        if not obj.previous_psychologist:
+            return None
+        return obj.previous_psychologist.get_full_name() or obj.previous_psychologist.username
+    
+    def get_new_psychologist_name(self, obj):
+        return obj.new_psychologist.get_full_name() or obj.new_psychologist.username
+    
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() or obj.created_by.username    

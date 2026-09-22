@@ -5,8 +5,8 @@ from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework.generics import get_object_or_404
-from patient.models import Patient, PatientNote
-from patient.serializers import PatientSerializer, PatientNoteSerializer
+from patient.models import Patient, PatientNote, CaseReassignment
+from patient.serializers import PatientSerializer, PatientNoteSerializer, CaseReassignmentSerializer
 from appointments.models import Appointment
 from appointments.serializers import AppointmentReadSerializer
 from psico_auth.serializer import UserSerializer
@@ -201,13 +201,10 @@ class PatientFileApiView(APIView):
             patient=patient, is_active=True
         ).select_related('doctor').order_by('-date', '-hour')
 
-        # No existe un campo "psicologo asignado" en Patient (un paciente
-        # puede pasar de psicologo entre citas). Se toma el doctor de la
-        # cita mas reciente como el responsable actual.
-        latest_appointment = appointments.first()
-        assigned_psychologist = (
-            latest_appointment.doctor if latest_appointment else None
-        )
+        # RF-31: psicologo responsable real del paciente (distinto del
+        # doctor de cada cita, RF-20). Se asigna/cambia via
+        # PatientReassignApiView, no se calcula de la cita mas reciente.
+        assigned_psychologist = patient.assigned_psychologist
 
         return Response({
             'general': PatientSerializer(patient).data,
@@ -238,3 +235,58 @@ class PatientDoctorApiView(APIView):
         ).distinct().order_by('first_name', 'last_name')
 
         return Response(UserSerializer(doctors, many=True).data)
+
+
+class PatientReassignApiView(APIView):
+    # POST /api/v1/patient/<patient_id>/reassign/
+    #
+    # RF-31 (B-2): reasigna el psicologo responsable del paciente. El
+    # motivo es obligatorio y cada traspaso queda registrado en
+    # CaseReassignment antes de tocar Patient.assigned_psychologist, para
+    # que nunca pueda cambiar sin dejar rastro en el historial. No toca
+    # citas anteriores (RF-30).
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, patient_id):
+        patient = get_object_or_404(Patient, pk=patient_id)
+
+        new_psychologist_id = request.data.get('new_psychologist')
+        reason = (request.data.get('reason') or '').strip()
+
+        if not new_psychologist_id:
+            return Response(
+                {'new_psychologist': 'Este campo es requerido.'}, status=400)
+        if not reason:
+            return Response(
+                {'reason': 'El motivo del traspaso es requerido.'}, status=400)
+
+        new_psychologist = get_object_or_404(
+            get_user_model(), pk=new_psychologist_id)
+
+        CaseReassignment.objects.create(
+            patient=patient,
+            previous_psychologist=patient.assigned_psychologist,
+            new_psychologist=new_psychologist,
+            reason=reason,
+            created_by=request.user,
+        )
+
+        patient.assigned_psychologist = new_psychologist
+        patient.save()
+
+        return Response(PatientSerializer(patient).data)
+
+
+class PatientReassignmentHistoryApiView(ListAPIView):
+    # GET /api/v1/patient/<patient_id>/reassignments/
+    #
+    # RF-31 (B-2): historial de traspasos del paciente, mas reciente
+    # primero (Meta.ordering de CaseReassignment).
+    serializer_class = CaseReassignmentSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        get_object_or_404(Patient, pk=self.kwargs['patient_id'])
+        return CaseReassignment.objects.filter(
+            patient_id=self.kwargs['patient_id'])
