@@ -3,6 +3,7 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.mixins import UpdateModelMixin
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth import get_user_model
 from rest_framework.generics import get_object_or_404
 from patient.models import Patient, PatientNote
 from patient.serializers import PatientSerializer, PatientNoteSerializer
@@ -200,9 +201,9 @@ class PatientFileApiView(APIView):
             patient=patient, is_active=True
         ).select_related('doctor').order_by('-date', '-hour')
 
-        # RF-31: no existe un campo "psicologo asignado" en Patient (un
-        # paciente puede pasar de psicologo entre citas). Se toma el
-        # doctor de la cita mas reciente como el responsable actual.
+        # No existe un campo "psicologo asignado" en Patient (un paciente
+        # puede pasar de psicologo entre citas). Se toma el doctor de la
+        # cita mas reciente como el responsable actual.
         latest_appointment = appointments.first()
         assigned_psychologist = (
             latest_appointment.doctor if latest_appointment else None
@@ -217,3 +218,23 @@ class PatientFileApiView(APIView):
                 if assigned_psychologist else None
             ),
         })
+class PatientDoctorApiView(APIView):
+    # GET /api/v1/patient/<patient_id>/doctors/
+    #
+    # RF-30 (B-2): lista, para un paciente dado, todos los profesionales
+    # que lo han atendido (una fila por cita, deduplicada). Es dato
+    # historico: si el psicologo asignado cambia (RF-31), las citas viejas
+    # conservan su propio doctor y siguen apareciendo aca.
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, patient_id):
+        get_object_or_404(Patient, pk=patient_id)
+
+        # RF-19: igual que en PatientFileApiView, solo citas activas
+        # (una cita desactivada no cuenta como "atencion").
+        doctors = get_user_model().objects.filter(
+            appointment__patient_id=patient_id,
+            appointment__is_active=True,
+        ).distinct().order_by('first_name', 'last_name')
+
+        return Response(UserSerializer(doctors, many=True).data)
