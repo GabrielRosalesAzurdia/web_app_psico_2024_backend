@@ -51,6 +51,19 @@ class Patient(models.Model):
         on_delete=models.PROTECT,
         related_name='patient'
     )
+
+    # RF-31: psicologo *responsable* del paciente, distinto del doctor de
+    # cada cita individual (RF-20). No se edita directo (ver
+    # PatientSerializer): solo cambia via CaseReassignment, para que el
+    # traspaso siempre quede con motivo y no toque citas pasadas (RF-30).
+    assigned_psychologist = models.ForeignKey(
+        get_user_model(),
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='assigned_patients',
+    )
+
     class Meta:
         constraints = [
             # RF-19: el nombre del paciente es unico en toda la tabla, sin
@@ -112,3 +125,22 @@ class PatientNote(models.Model):
 
     def __str__(self):
         return f'Nota de {self.patient.name} por {self.author.username} ({self.created_at:%Y-%m-%d %H:%M})'
+
+class CaseReassignment(models.Model):
+    patient = models.ForeignKey(
+        Patient, related_name='reassignments', on_delete=models.CASCADE)
+    previous_psychologist = models.ForeignKey(
+        get_user_model(), null= True, blank=True,
+        related_name='+', on_delete=models.PROTECT)
+    new_psychologist = models.ForeignKey(
+        get_user_model(), related_name='+', on_delete=models.PROTECT)
+    reason = models.TextField()
+    created_by = models.ForeignKey(
+        get_user_model(),related_name='+', on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+                    ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.patient.name}: {self.previous_psychologist}->{self.new_psychologist}'
