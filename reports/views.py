@@ -498,3 +498,42 @@ class ScheduleStatsApiView(APIView):
             'by_doctor': by_doctor,
             'by_place': by_place,
         })
+class PsychologistPatientsApiView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        doctor_id= request.query_params.get('doctor_id')
+        if not doctor_id:
+            return Response({'detail': 'doctor_id es requerido.'}, status =400)
+            
+        count = Patient.objects.filter(
+            assigned_psychologist_id = doctor_id,
+            is_active =True,
+        ).count()
+        
+        return Response({
+            'doctor_id': int(doctor_id),
+            'assigned_patients': count,
+        })
+        
+class PatientDoctorsApiView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, patient_id):
+        queryset = _apply_filters(
+            Appointment.objects.filter(patient_id =patient_id),
+            request.query_params,
+        )
+        by_doctor =[
+        {
+            'doctor_id': d['doctor_id'],
+            'doctor': f"{d['doctor__first_name']} {d['doctor__last_name']}".strip(),
+        }
+        for d in (
+            queryset.values('doctor_id', 'doctor__first_name', 'doctor__last_name').annotate(count =Count('id')).order_by('-count')
+        )
+    ]
+        return Response({
+        'patient_id': patient_id,
+        'by_doctor': by_doctor,
+    })
