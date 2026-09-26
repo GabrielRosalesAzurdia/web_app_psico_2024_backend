@@ -144,3 +144,53 @@ class CaseReassignment(models.Model):
 
     def __str__(self):
         return f'{self.patient.name}: {self.previous_psychologist}->{self.new_psychologist}'
+
+
+class ConsentTextVersion(models.Model):
+    # RF-33: el texto del consentimiento informado se versiona. Una version
+    # publicada no se edita: si cambia el texto se crea una version nueva,
+    # asi cada paciente queda ligado al texto exacto que se le entrego.
+    version = models.CharField(max_length=20, unique=True)
+    content = models.TextField()
+    is_current = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        get_user_model(), related_name='+', on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Consentimiento informado v{self.version}'
+
+
+class PatientConsent(models.Model):
+    # RF-33: cada paciente queda ligado a la version del consentimiento que
+    # firmo. No se edita: si cambia el texto se crea una version nueva y los
+    # pacientes nuevos quedan ligados a esa version.
+    class StatusTypes(models.TextChoices):
+        PENDING = 'PENDING', _('Pendiente')
+        ACCEPTED = 'ACCEPTED', _('Aceptado')
+        REJECTED = 'REJECTED', _('Rechazado')
+
+    patient = models.ForeignKey(
+        Patient, related_name='consents', on_delete=models.CASCADE)
+    text_version = models.ForeignKey(
+        ConsentTextVersion, related_name='patient_consents', on_delete=models.PROTECT)
+    status = models.CharField(
+        max_length=20, choices=StatusTypes.choices, default=StatusTypes.PENDING)
+    created_by = models.ForeignKey(
+        get_user_model(), related_name='+', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Se llenan al cargar el documento firmado. Quedan vacios mientras
+    # el consentimiento este pendiente.
+    uploaded_file = models.FileField(upload_to='consents/', null=True, blank=True)
+    updated_by = models.ForeignKey(
+        get_user_model(), null=True, blank=True, related_name='+', on_delete=models.PROTECT)
+    updated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.patient.name} - v{self.text_version.version} ({self.status})'
