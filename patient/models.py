@@ -165,13 +165,12 @@ class ConsentTextVersion(models.Model):
 
 
 class PatientConsent(models.Model):
-    # RF-33: cada paciente queda ligado a la version del consentimiento que
-    # firmo. No se edita: si cambia el texto se crea una version nueva y los
-    # pacientes nuevos quedan ligados a esa version.
+    # RF-33: consentimiento de UN paciente. Nace pendiente al generar el
+    # documento y pasa a firmado cuando se carga el escaneado. Mientras
+    # este pendiente no se deben registrar notas clinicas (RF-26).
     class StatusTypes(models.TextChoices):
         PENDING = 'PENDING', _('Pendiente')
-        ACCEPTED = 'ACCEPTED', _('Aceptado')
-        REJECTED = 'REJECTED', _('Rechazado')
+        SIGNED = 'SIGNED', _('Firmado y resguardado')
 
     patient = models.ForeignKey(
         Patient, related_name='consents', on_delete=models.CASCADE)
@@ -180,14 +179,13 @@ class PatientConsent(models.Model):
     status = models.CharField(
         max_length=20, choices=StatusTypes.choices, default=StatusTypes.PENDING)
     created_by = models.ForeignKey(
-        get_user_model(), related_name='+', on_delete=models.CASCADE)
+        get_user_model(), related_name='+', on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
     # Se llenan al cargar el documento firmado. Quedan vacios mientras
     # el consentimiento este pendiente.
-    uploaded_file = models.FileField(upload_to='consents/', null=True, blank=True)
-    updated_by = models.ForeignKey(
+    uploaded_by = models.ForeignKey(
         get_user_model(), null=True, blank=True, related_name='+', on_delete=models.PROTECT)
-    updated_at = models.DateTimeField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
