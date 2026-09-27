@@ -186,6 +186,13 @@ class PatientConsent(models.Model):
     uploaded_by = models.ForeignKey(
         get_user_model(), null=True, blank=True, related_name='+', on_delete=models.PROTECT)
     uploaded_at = models.DateTimeField(null=True, blank=True)
+    # RF-33 (B-3): escaneado del consentimiento firmado (PDF o imagen).
+    # Opcional: el original se resguarda en fisico. Se guarda en la BD y no
+    # en media/ porque el disco de Render se borra en cada deploy, y solo se
+    # entrega por un endpoint autenticado, nunca con un enlace publico.
+    file_data = models.BinaryField(null=True, blank=True)
+    file_name = models.CharField(max_length=255, blank=True, default='')
+    file_content_type = models.CharField(max_length=100, blank=True, default='')
 
     class Meta:
         ordering = ['-created_at']

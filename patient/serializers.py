@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from patient.models import Patient, PatientNote, CaseReassignment
+from patient.models import Patient, PatientNote, CaseReassignment, PatientConsent
 
 class PatientSerializer(serializers.ModelSerializer):
     created_by = serializers.HiddenField(
@@ -101,3 +101,23 @@ class CaseReassignmentSerializer(serializers.ModelSerializer):
     
     def get_created_by_name(self, obj):
         return obj.created_by.get_full_name() or obj.created_by.username    
+
+
+class PatientConsentSerializer(serializers.ModelSerializer):
+    # RF-33 (B-3): no expone el archivo, solo sus datos. El archivo se
+    # descarga aparte por PatientConsentFileApiView.
+    text_version = serializers.CharField(source='text_version.version')
+    uploaded_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PatientConsent
+        fields = [
+            'id', 'text_version', 'status', 'file_name',
+            'uploaded_by_name', 'uploaded_at', 'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_uploaded_by_name(self, obj):
+        if not obj.uploaded_by:
+            return None
+        return obj.uploaded_by.get_full_name() or obj.uploaded_by.username

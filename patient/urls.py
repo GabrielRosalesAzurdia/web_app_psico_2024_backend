@@ -12,6 +12,9 @@ from patient.views import (
     PatientDoctorApiView,
     PatientReassignApiView,
     PatientReassignmentHistoryApiView,
+    PatientConsentDocumentApiView,
+    PatientConsentUploadApiView,
+    PatientConsentFileApiView,
 )
 
 urlpatterns = [
@@ -33,6 +36,15 @@ urlpatterns = [
     path('<int:patient_id>/reassignments/',
          PatientReassignmentHistoryApiView.as_view(),
          name='patient-reassignments'),
+    path('<int:patient_id>/consent/document/',
+         PatientConsentDocumentApiView.as_view(),
+         name='patient-consent-document'),
+    path('<int:patient_id>/consent/upload/',
+         PatientConsentUploadApiView.as_view(),
+         name='patient-consent-upload'),
+    path('<int:patient_id>/consent/<int:pk>/file/',
+         PatientConsentFileApiView.as_view(),
+         name='patient-consent-file'),
     path('list/', PatientListApiView.as_view(), name='patient-list'),
     path('incomplete/',
          PatientIncompleteFieldsApiView.as_view(),

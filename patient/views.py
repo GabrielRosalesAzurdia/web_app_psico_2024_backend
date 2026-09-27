@@ -5,14 +5,22 @@ from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework.generics import get_object_or_404
-from patient.models import Patient, PatientNote, CaseReassignment
-from patient.serializers import PatientSerializer, PatientNoteSerializer, CaseReassignmentSerializer
+from patient.models import Patient, PatientNote, CaseReassignment, ConsentTextVersion, PatientConsent
+from patient.serializers import PatientSerializer, PatientNoteSerializer, CaseReassignmentSerializer, PatientConsentSerializer
 from appointments.models import Appointment
 from appointments.serializers import AppointmentReadSerializer
 from psico_auth.serializer import UserSerializer
 from rest_framework import filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from io import BytesIO
+from xml.sax.saxutils import escape
+from django.http import HttpResponse
+from django.utils.timezone import localdate
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
 
 def _active_unless_requested(queryset, query_params):
@@ -290,3 +298,136 @@ class PatientReassignmentHistoryApiView(ListAPIView):
         get_object_or_404(Patient, pk=self.kwargs['patient_id'])
         return CaseReassignment.objects.filter(
             patient_id=self.kwargs['patient_id'])
+
+
+class PatientConsentDocumentApiView(APIView):
+    # GET /api/v1/patient/<patient_id>/consent/document/
+    #
+    # RF-33 (B-2): genera el PDF del consentimiento informado con los datos
+    # del paciente prellenados, usando la version vigente del texto
+    # (is_current=True).
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, patient_id):
+        patient = get_object_or_404(Patient, pk=patient_id)
+
+        text_version = ConsentTextVersion.objects.filter(is_current=True).first()
+        if text_version is None:
+            return Response(
+                {'detail': 'No hay una version vigente del consentimiento.'},
+                status=400)
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter,
+                                rightMargin=inch, leftMargin=inch,
+                                topMargin=inch, bottomMargin=inch)
+        styles = getSampleStyleSheet()
+        elements = []
+
+        elements.append(Paragraph("Daniel Padnos Wellness Center", styles['Title']))
+        elements.append(Paragraph("Consentimiento informado", styles['Title']))
+        elements.append(Paragraph(
+            f"Version {escape(text_version.version)} - Generado el {localdate():%d/%m/%Y}",
+            styles['Normal']))
+        elements.append(Spacer(1, 20))
+
+        elements.append(Paragraph("Datos del paciente", styles['Heading2']))
+        elements.append(Paragraph(f"Nombre: {escape(patient.name)}", styles['Normal']))
+        elements.append(Paragraph(f"Edad: {patient.age} años", styles['Normal']))
+        if patient.birth_date:
+            elements.append(Paragraph(
+                f"Fecha de nacimiento: {patient.birth_date:%d/%m/%Y}", styles['Normal']))
+        elements.append(Spacer(1, 20))
+
+        # Cada bloque del texto separado por una linea en blanco se vuelve
+        # un parrafo del PDF.
+        for block in text_version.content.split('\n\n'):
+            elements.append(Paragraph(
+                escape(block).replace('\n', '<br/>'), styles['Normal']))
+            elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 40))
+
+        # Menor de edad: autoriza y firma el padre, madre o tutor.
+        if patient.age < 18:
+            elements.append(Paragraph(
+                "Autorizacion del padre, madre o tutor", styles['Heading2']))
+            elements.append(Paragraph(
+                f"Nombre del tutor: {escape(patient.tutor) or '______________________'}",
+                styles['Normal']))
+            elements.append(Spacer(1, 30))
+            elements.append(Paragraph(
+                "Firma del tutor: ______________________", styles['Normal']))
+        else:
+            elements.append(Paragraph(
+                "Firma del paciente: ______________________", styles['Normal']))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = f"consentimiento_{patient.pk}_v{text_version.version}.pdf"
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+
+class PatientConsentUploadApiView(APIView):
+    # POST /api/v1/patient/<patient_id>/consent/upload/
+    #
+    # RF-33 (B-3): carga el escaneado del consentimiento firmado (PDF o
+    # imagen) en el campo "file" (multipart/form-data). Es opcional: el
+    # original queda en fisico y nada se bloquea si no se carga. Queda
+    # ligado a la version vigente del texto y marcado como firmado.
+    permission_classes = [IsAuthenticated]
+    ALLOWED_CONTENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
+
+    def post(self, request, patient_id):
+        patient = get_object_or_404(Patient, pk=patient_id)
+
+        uploaded = request.FILES.get('file')
+        if uploaded is None:
+            return Response({'file': 'Este campo es requerido.'}, status=400)
+        if uploaded.content_type not in self.ALLOWED_CONTENT_TYPES:
+            return Response(
+                {'file': 'Solo se permiten archivos PDF, JPG o PNG.'}, status=400)
+
+        text_version = ConsentTextVersion.objects.filter(is_current=True).first()
+        if text_version is None:
+            return Response(
+                {'detail': 'No hay una version vigente del consentimiento.'},
+                status=400)
+
+        consent = PatientConsent.objects.create(
+            patient=patient,
+            text_version=text_version,
+            status=PatientConsent.StatusTypes.SIGNED,
+            created_by=request.user,
+            uploaded_by=request.user,
+            uploaded_at=timezone.now(),
+            file_data=uploaded.read(),
+            # Sin comillas: rompen el encabezado Content-Disposition al descargar.
+            file_name=uploaded.name.replace('"', ''),
+            file_content_type=uploaded.content_type,
+        )
+        return Response(PatientConsentSerializer(consent).data, status=201)
+
+
+class PatientConsentFileApiView(APIView):
+    # GET /api/v1/patient/<patient_id>/consent/<pk>/file/
+    #
+    # RF-33 (B-3): descarga el escaneado. Es la unica forma de obtenerlo y
+    # exige usuario autenticado, asi el archivo nunca queda en un enlace
+    # publico permanente.
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, patient_id, pk):
+        consent = get_object_or_404(
+            PatientConsent, pk=pk, patient_id=patient_id)
+        if not consent.file_data:
+            return Response(
+                {'detail': 'Este consentimiento no tiene archivo cargado.'},
+                status=404)
+
+        response = HttpResponse(
+            bytes(consent.file_data), content_type=consent.file_content_type)
+        response['Content-Disposition'] = f'attachment; filename="{consent.file_name}"'
+        return response
