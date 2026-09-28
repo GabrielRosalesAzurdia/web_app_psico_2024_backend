@@ -7,6 +7,7 @@ from rest_framework import serializers
 from dj_rest_auth.registration.serializers import RegisterSerializer
 
 from profiles.models import Profile
+from psico_auth.enums import GroupName
 
 
 class UserRegisterSerializer(RegisterSerializer):
@@ -36,7 +37,9 @@ class UserRegisterSerializer(RegisterSerializer):
     def save(self, request):
         phone_number = self.validated_data.pop('phone_number')
 
-        group, _ = Group.objects.get_or_create(name='client')
+        # RNF-02 (B-1): quien se registra entra con el rol de menos permisos;
+        # un administrador lo cambia a profesional desde el admin si aplica.
+        group, _ = Group.objects.get_or_create(name=GroupName.RECEPTION.value)
 
         user = super().save(request)
         user.groups.add(group)

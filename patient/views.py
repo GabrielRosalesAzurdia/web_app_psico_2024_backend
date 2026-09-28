@@ -13,6 +13,8 @@ from psico_auth.serializer import UserSerializer
 from rest_framework import filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from audit.models import AuditLog
+from audit.mixins import AuditLogMixin
 from io import BytesIO
 from xml.sax.saxutils import escape
 from django.http import HttpResponse
@@ -20,8 +22,9 @@ from django.utils.timezone import localdate
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+from psico_auth.permissions import IsProfessional
 
 def _active_unless_requested(queryset, query_params):
     """RF-19 (soft delete): "eliminar" un paciente NO borra su fila de la base
@@ -138,14 +141,14 @@ class PatientIncompleteFieldsApiView(APIView):
         })
 
 
-class PatientNoteListCreateApiView(ListCreateAPIView):
+class PatientNoteListCreateApiView(AuditLogMixin, ListCreateAPIView):
     # GET/POST /api/v1/patient/<patient_id>/notes/
     #
     # RF-26: notas clinicas del expediente, independientes de una cita.
     # No hay bloqueo por consentimiento todavia (RF-33 no existe en el
     # sistema); cuando exista, va aca en get_queryset/perform_create.
     serializer_class = PatientNoteSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsProfessional]
     pagination_class = None
 
     def get_queryset(self):
@@ -168,13 +171,13 @@ class IsPatientNoteAuthor(BasePermission):
         return obj.author_id == request.user.id
 
 
-class PatientNoteDetailApiView(UpdateModelMixin,DestroyAPIView ):
+class PatientNoteDetailApiView(AuditLogMixin, UpdateModelMixin,DestroyAPIView ):
     # DELETE /api/v1/patient/<patient_id>/notes/<pk>/ -> 204 sin cuerpo;
     # 403 si no sos el autor. No estaba en el alcance original de RF-26
     # ("acumulativas, no se borran"), pero hace falta para poder limpiar
     # una nota cargada por error sin dejarla para siempre en el expediente.
     serializer_class = PatientNoteSerializer
-    permission_classes = [IsAuthenticated, IsPatientNoteAuthor]
+    permission_classes = [IsAuthenticated, IsPatientNoteAuthor, IsProfessional]
     queryset = PatientNote.objects.all()
     def patch(self, request, *args, **kwargs):
         return self.partial_update(request, *args, **kwargs)
@@ -185,7 +188,7 @@ class PatientNoteDetailApiView(UpdateModelMixin,DestroyAPIView ):
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save()
-class PatientFileApiView(APIView):
+class PatientFileApiView(AuditLogMixin, APIView):
     # GET /api/v1/patient/<patient_id>/file/
     #
     # Ficha unica del paciente: junta en una sola respuesta sus datos
@@ -198,7 +201,7 @@ class PatientFileApiView(APIView):
     # acceso a una seccion sin dar acceso a la otra (por ejemplo, alguien
     # que ve la agenda pero no las notas clinicas), es este metodo el que
     # hay que tocar para armar el dict de forma condicional segun el rol.
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsProfessional]
 
     def get(self, request, patient_id):
         patient = get_object_or_404(Patient, pk=patient_id)
@@ -300,13 +303,14 @@ class PatientReassignmentHistoryApiView(ListAPIView):
             patient_id=self.kwargs['patient_id'])
 
 
-class PatientConsentDocumentApiView(APIView):
+class PatientConsentDocumentApiView(AuditLogMixin, APIView):
     # GET /api/v1/patient/<patient_id>/consent/document/
     #
     # RF-33 (B-2): genera el PDF del consentimiento informado con los datos
     # del paciente prellenados, usando la version vigente del texto
     # (is_current=True).
-    permission_classes = [IsAuthenticated]
+    audit_action = AuditLog.ActionTypes.EXPORT
+    permission_classes = [IsAuthenticated, IsProfessional]
 
     def get(self, request, patient_id):
         patient = get_object_or_404(Patient, pk=patient_id)
@@ -370,7 +374,7 @@ class PatientConsentDocumentApiView(APIView):
         return response
 
 
-class PatientConsentUploadApiView(APIView):
+class PatientConsentUploadApiView(AuditLogMixin, APIView):
     # POST /api/v1/patient/<patient_id>/consent/upload/
     #
     # RF-33 (B-3): carga el escaneado del consentimiento firmado (PDF o
@@ -378,7 +382,7 @@ class PatientConsentUploadApiView(APIView):
     # original queda en fisico y nada se bloquea si no se carga. Queda
     # ligado a la version vigente del texto, y como hay escaneado firmado
     # se marca el check consent_signed del paciente.
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsProfessional]
     ALLOWED_CONTENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 
     def post(self, request, patient_id):
@@ -413,13 +417,13 @@ class PatientConsentUploadApiView(APIView):
         return Response(PatientConsentSerializer(consent).data, status=201)
 
 
-class PatientConsentFileApiView(APIView):
+class PatientConsentFileApiView(AuditLogMixin, APIView):
     # GET /api/v1/patient/<patient_id>/consent/<pk>/file/
     #
     # RF-33 (B-3): descarga el escaneado. Es la unica forma de obtenerlo y
     # exige usuario autenticado, asi el archivo nunca queda en un enlace
     # publico permanente.
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsProfessional]
 
     def get(self, request, patient_id, pk):
         consent = get_object_or_404(
@@ -432,4 +436,142 @@ class PatientConsentFileApiView(APIView):
         response = HttpResponse(
             bytes(consent.file_data), content_type=consent.file_content_type)
         response['Content-Disposition'] = f'attachment; filename="{consent.file_name}"'
+        return response
+
+
+def _pdf_table(rows, col_widths, header=True):
+    # Tabla con bordes para los PDF del expediente. Si header=True la
+    # primera fila es el encabezado y se repite en cada pagina.
+    table = Table(rows, colWidths=col_widths, repeatRows=1 if header else 0)
+    style = [
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]
+    if header:
+        style.append(('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey))
+    table.setStyle(TableStyle(style))
+    return table
+
+
+class PatientExportApiView(AuditLogMixin, APIView):
+    # GET /api/v1/patient/<patient_id>/export/
+    #
+    # RF-34 (B-1): copia imprimible del expediente completo en PDF: datos
+    # generales, notas clinicas, historial de citas y profesionales que
+    # atendieron al paciente, con la fecha de generacion y el usuario que
+    # lo genero. Usa las mismas consultas que PatientFileApiView (RF-25) y
+    # PatientDoctorApiView (RF-30).
+    audit_action = AuditLog.ActionTypes.EXPORT
+    permission_classes = [IsAuthenticated, IsProfessional]
+
+    def get(self, request, patient_id):
+        patient = get_object_or_404(Patient, pk=patient_id)
+
+        notes = patient.clinical_notes.filter(is_active=True).select_related('author')
+        appointments = Appointment.objects.filter(
+            patient=patient, is_active=True
+        ).select_related('doctor').order_by('-date', '-hour')
+        doctors = get_user_model().objects.filter(
+            appointment__patient_id=patient_id,
+            appointment__is_active=True,
+        ).distinct().order_by('first_name', 'last_name')
+
+        def user_name(user):
+            return escape(user.get_full_name() or user.username)
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter,
+                                rightMargin=inch, leftMargin=inch,
+                                topMargin=inch, bottomMargin=inch)
+        styles = getSampleStyleSheet()
+        normal = styles['Normal']
+        elements = []
+
+        elements.append(Paragraph("Daniel Padnos Wellness Center", styles['Title']))
+        elements.append(Paragraph("Expediente del paciente", styles['Title']))
+        elements.append(Paragraph(
+            f"Generado el {timezone.localtime():%d/%m/%Y %H:%M} por {user_name(request.user)}",
+            normal))
+        elements.append(Spacer(1, 20))
+
+        # 1. Datos generales
+        elements.append(Paragraph("1. Datos generales", styles['Heading2']))
+        general = [
+            ('Nombre', patient.name),
+            ('Edad', f'{patient.age} años'),
+            ('Fecha de nacimiento',
+             f'{patient.birth_date:%d/%m/%Y}' if patient.birth_date else ''),
+            ('Género', patient.get_gender_display()),
+            ('Teléfono', patient.phone),
+            ('Dirección', patient.address),
+            ('Grado', patient.grade),
+            ('Lugar', patient.get_place_display()),
+            ('Tutor', patient.tutor),
+            ('Teléfono del encargado', patient.managers_phone_number),
+            ('Psicólogo asignado',
+             (patient.assigned_psychologist.get_full_name()
+              or patient.assigned_psychologist.username)
+             if patient.assigned_psychologist else ''),
+            ('Consentimiento firmado', 'Sí' if patient.consent_signed else 'No'),
+        ]
+        elements.append(_pdf_table(
+            [[Paragraph(f'<b>{label}</b>', normal),
+              Paragraph(escape(str(value).strip()) or '-', normal)]
+             for label, value in general],
+            [2.2 * inch, 4.3 * inch], header=False))
+        elements.append(Spacer(1, 20))
+
+        # 2. Notas clinicas (RF-26), la mas reciente primero
+        elements.append(Paragraph("2. Notas clínicas", styles['Heading2']))
+        if not notes:
+            elements.append(Paragraph("Sin notas registradas.", normal))
+        for note in notes:
+            # La BD guarda las fechas en UTC; localtime las pasa a la hora local.
+            created_at = timezone.localtime(note.created_at)
+            header = f'<b>{created_at:%d/%m/%Y %H:%M} - {user_name(note.author)}</b>'
+            if note.edited_at:
+                header += f' (editada el {timezone.localtime(note.edited_at):%d/%m/%Y %H:%M})'
+            elements.append(Paragraph(header, normal))
+            elements.append(Paragraph(
+                escape(note.content).replace('\n', '<br/>'), normal))
+            elements.append(Spacer(1, 10))
+        elements.append(Spacer(1, 10))
+
+        # 3. Historial de citas (RF-19: solo citas activas)
+        elements.append(Paragraph("3. Historial de citas", styles['Heading2']))
+        if not appointments:
+            elements.append(Paragraph("Sin citas registradas.", normal))
+        else:
+            rows = [[Paragraph(f'<b>{h}</b>', normal) for h in
+                     ('Fecha', 'Hora', 'Profesional', 'Estado', 'Lugar', 'Observaciones')]]
+            for appointment in appointments:
+                rows.append([
+                    Paragraph(f'{appointment.date:%d/%m/%Y}', normal),
+                    Paragraph(f'{appointment.hour:%H:%M}', normal),
+                    Paragraph(user_name(appointment.doctor), normal),
+                    Paragraph(str(appointment.get_status_display()), normal),
+                    Paragraph(str(appointment.get_place_display()), normal),
+                    Paragraph(escape(appointment.notes).replace('\n', '<br/>'), normal),
+                ])
+            elements.append(_pdf_table(
+                rows, [0.9 * inch, 0.6 * inch, 1.2 * inch,
+                       0.85 * inch, 0.85 * inch, 2.1 * inch]))
+        elements.append(Spacer(1, 20))
+
+        # 4. Profesionales que lo atendieron (RF-30). KeepTogether evita que
+        # el titulo quede solo al final de una pagina y la lista en la otra.
+        section = [Paragraph(
+            "4. Profesionales que atendieron al paciente", styles['Heading2'])]
+        if not doctors:
+            section.append(Paragraph("Sin profesionales registrados.", normal))
+        for doctor in doctors:
+            section.append(Paragraph(f'- {user_name(doctor)}', normal))
+        elements.append(KeepTogether(section))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = f"expediente_{patient.pk}_{localdate():%Y%m%d}.pdf"
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response

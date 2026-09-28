@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'express_appointment.apps.ExpressAppointmentConfig',
     'activity.apps.ActivityConfig',
     'note.apps.NoteConfig',
+    'audit.apps.AuditConfig',
     'reports',
 
     'django.contrib.sites',

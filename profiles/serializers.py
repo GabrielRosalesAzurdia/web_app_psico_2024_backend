@@ -6,6 +6,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source='profile.phone_number', required=False)
     image = serializers.ImageField(source='profile.image', required=False)
     group = serializers.SerializerMethodField(read_only=True)
+    roles = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = get_user_model()
@@ -18,6 +19,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'phone_number',
             'image',
             'group',
+            'roles',
         ]
 
         extra_kwargs = {
@@ -28,6 +30,13 @@ class ProfileSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_group(obj) -> str:
         return obj.groups.first().name if obj.groups.first() else None
+
+    @staticmethod 
+    def get_roles(obj) -> list[str]:
+        # RNF-02 (B-1): todos los roles del usuario, para que el frontend
+        # muestre u oculte secciones. "group" se queda por compatibilidad.
+
+        return [group.name for group in obj.groups.all()]
 
     @staticmethod
     def update_profile(instance, data):

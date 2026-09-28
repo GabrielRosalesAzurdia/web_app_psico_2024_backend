@@ -15,6 +15,7 @@ from patient.views import (
     PatientConsentDocumentApiView,
     PatientConsentUploadApiView,
     PatientConsentFileApiView,
+    PatientExportApiView,
 )
 
 urlpatterns = [
@@ -45,6 +46,9 @@ urlpatterns = [
     path('<int:patient_id>/consent/<int:pk>/file/',
          PatientConsentFileApiView.as_view(),
          name='patient-consent-file'),
+    path('<int:patient_id>/export/',
+         PatientExportApiView.as_view(),
+         name='patient-export'),
     path('list/', PatientListApiView.as_view(), name='patient-list'),
     path('incomplete/',
          PatientIncompleteFieldsApiView.as_view(),
