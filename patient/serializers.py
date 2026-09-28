@@ -112,7 +112,7 @@ class PatientConsentSerializer(serializers.ModelSerializer):
     class Meta:
         model = PatientConsent
         fields = [
-            'id', 'text_version', 'status', 'file_name',
+            'id', 'text_version', 'file_name',
             'uploaded_by_name', 'uploaded_at', 'created_at',
         ]
         read_only_fields = fields

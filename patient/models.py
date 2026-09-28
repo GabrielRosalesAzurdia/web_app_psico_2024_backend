@@ -46,6 +46,11 @@ class Patient(models.Model):
     # (y perder el historial de citas asociadas), se desactiva.
     is_active = models.BooleanField(default=True)
 
+    # RF-33: el consentimiento firmado se resguarda en fisico; aqui solo se
+    # marca si ya se tiene. Se edita con el resto del paciente y se marca
+    # solo al cargar el escaneado (PatientConsent), que es opcional.
+    consent_signed = models.BooleanField(default=False)
+
     created_by = models.ForeignKey(
         get_user_model(),
         on_delete=models.PROTECT,
@@ -165,24 +170,16 @@ class ConsentTextVersion(models.Model):
 
 
 class PatientConsent(models.Model):
-    # RF-33: consentimiento de UN paciente. Nace pendiente al generar el
-    # documento y pasa a firmado cuando se carga el escaneado. Mientras
-    # este pendiente no se deben registrar notas clinicas (RF-26).
-    class StatusTypes(models.TextChoices):
-        PENDING = 'PENDING', _('Pendiente')
-        SIGNED = 'SIGNED', _('Firmado y resguardado')
-
+    # RF-33: escaneado opcional del consentimiento firmado de UN paciente,
+    # ligado a la version del texto. Si el paciente firmo o no lo dice
+    # Patient.consent_signed, no este modelo.
     patient = models.ForeignKey(
         Patient, related_name='consents', on_delete=models.CASCADE)
     text_version = models.ForeignKey(
         ConsentTextVersion, related_name='patient_consents', on_delete=models.PROTECT)
-    status = models.CharField(
-        max_length=20, choices=StatusTypes.choices, default=StatusTypes.PENDING)
     created_by = models.ForeignKey(
         get_user_model(), related_name='+', on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
-    # Se llenan al cargar el documento firmado. Quedan vacios mientras
-    # el consentimiento este pendiente.
     uploaded_by = models.ForeignKey(
         get_user_model(), null=True, blank=True, related_name='+', on_delete=models.PROTECT)
     uploaded_at = models.DateTimeField(null=True, blank=True)
@@ -198,4 +195,4 @@ class PatientConsent(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.patient.name} - v{self.text_version.version} ({self.status})'
+        return f'{self.patient.name} - v{self.text_version.version} ({self.file_name})'

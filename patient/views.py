@@ -376,7 +376,8 @@ class PatientConsentUploadApiView(APIView):
     # RF-33 (B-3): carga el escaneado del consentimiento firmado (PDF o
     # imagen) en el campo "file" (multipart/form-data). Es opcional: el
     # original queda en fisico y nada se bloquea si no se carga. Queda
-    # ligado a la version vigente del texto y marcado como firmado.
+    # ligado a la version vigente del texto, y como hay escaneado firmado
+    # se marca el check consent_signed del paciente.
     permission_classes = [IsAuthenticated]
     ALLOWED_CONTENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 
@@ -399,7 +400,6 @@ class PatientConsentUploadApiView(APIView):
         consent = PatientConsent.objects.create(
             patient=patient,
             text_version=text_version,
-            status=PatientConsent.StatusTypes.SIGNED,
             created_by=request.user,
             uploaded_by=request.user,
             uploaded_at=timezone.now(),
@@ -408,6 +408,8 @@ class PatientConsentUploadApiView(APIView):
             file_name=uploaded.name.replace('"', ''),
             file_content_type=uploaded.content_type,
         )
+        patient.consent_signed = True
+        patient.save()
         return Response(PatientConsentSerializer(consent).data, status=201)
 
 
