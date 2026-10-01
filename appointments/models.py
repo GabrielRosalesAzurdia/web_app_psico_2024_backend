@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from appointments.schedule import TimeBlock
+from web_app_psico_2024_backend.encrypted_fields import EncryptedTextField
 
 class Appointment(models.Model):
 
@@ -25,7 +26,7 @@ class Appointment(models.Model):
         choices=PlaceType.choices,
         default=PlaceType.CDO
     )
-    notes = models.TextField(blank=True, default='')
+    notes = EncryptedTextField(blank=True, default='')
     
 
     # created_by = models.ForeignKey(
@@ -60,6 +61,21 @@ class Appointment(models.Model):
     # cumplida/pendiente/cancelada), que sigue siendo un estado que el
     # psicologo elige activamente sobre una cita vigente.
     is_active = models.BooleanField(default=True)
+
+    def save(self, *args, **kwargs):
+        # RNF-07: cada vez que se guarda una cita (crearla, marcar asistencia,
+        # editarla o desactivarla) se recalcula la ultima atencion del
+        # paciente. Si la edicion cambio la cita de paciente, se recalcula
+        # tambien el anterior, que pudo perder su ultima atencion.
+        previous_patient_id = None
+        if self.pk:
+            previous_patient_id = Appointment.objects.filter(
+                pk=self.pk).values_list('patient_id', flat=True).first()
+        super().save(*args, **kwargs)
+        self.patient.refresh_last_attention_date()
+        if previous_patient_id and previous_patient_id != self.patient_id:
+            Patient = self._meta.get_field('patient').related_model
+            Patient.objects.get(pk=previous_patient_id).refresh_last_attention_date()
 
     def __str__(self):
         return f'{self.date} - {self.patient} - {self.doctor}'

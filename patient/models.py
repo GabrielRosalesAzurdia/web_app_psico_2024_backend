@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from django.utils.timezone import localdate
 from django.db.models.functions import Lower
+from web_app_psico_2024_backend.encrypted_fields import EncryptedBinaryField, EncryptedTextField
 
 class Patient(models.Model):
 
@@ -38,7 +39,7 @@ class Patient(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     state = models.BooleanField()
-    stateDescription =models.TextField(blank=True, default='')
+    stateDescription = EncryptedTextField(blank=True, default='')
 
     # RF-19: distinto de "state" (que es el estado de asistencia
     # Activo/Inasistencia/Pendiente, ver PatientForm.tsx). is_active
@@ -50,6 +51,12 @@ class Patient(models.Model):
     # marca si ya se tiene. Se edita con el resto del paciente y se marca
     # solo al cargar el escaneado (PatientConsent), que es opcional.
     consent_signed = models.BooleanField(default=False)
+
+    # RNF-07: fecha de la ultima cita atendida (status DONE), para aplicar
+    # despues la politica de conservacion del expediente. No se edita a
+    # mano: la recalcula Appointment.save() con refresh_last_attention_date.
+    # Vacia si el paciente nunca ha sido atendido.
+    last_attention_date = models.DateField(null=True, blank=True)
 
     created_by = models.ForeignKey(
         get_user_model(),
@@ -96,6 +103,19 @@ class Patient(models.Model):
             self.age = self.calculate_age(self.birth_date)
         super().save(*args, **kwargs)
 
+    def refresh_last_attention_date(self):
+        # RNF-07: recalcula la fecha de ultima atencion desde las citas.
+        # Se recalcula siempre (en vez de solo copiar la fecha de la cita
+        # que se acaba de guardar) para que tambien quede bien si una cita
+        # deja de estar atendida, se desactiva o se registra con fecha vieja.
+        last = self.appointment.filter(
+            status='DONE', is_active=True,
+        ).aggregate(last=models.Max('date'))['last']
+        # update() y no save(): solo toca esta columna, sin pasar por
+        # Patient.save() (recalculo de edad).
+        Patient.objects.filter(pk=self.pk).update(last_attention_date=last)
+        self.last_attention_date = last
+
     def __str__(self):
         return f'{self.name} - {self.phone} - {self.age}'
 
@@ -113,7 +133,7 @@ class PatientNote(models.Model):
         Patient, related_name='clinical_notes', on_delete=models.CASCADE)
     author = models.ForeignKey(
         get_user_model(), related_name='patient_notes', on_delete=models.CASCADE)
-    content = models.TextField()
+    content = EncryptedTextField()
     edited_by = models.ForeignKey(
         get_user_model(), null=True, blank=True,
         related_name='edited_patient_notes', on_delete=models.SET_NULL)
@@ -139,7 +159,7 @@ class CaseReassignment(models.Model):
         related_name='+', on_delete=models.PROTECT)
     new_psychologist = models.ForeignKey(
         get_user_model(), related_name='+', on_delete=models.PROTECT)
-    reason = models.TextField()
+    reason = EncryptedTextField()
     created_by = models.ForeignKey(
         get_user_model(),related_name='+', on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -187,7 +207,7 @@ class PatientConsent(models.Model):
     # Opcional: el original se resguarda en fisico. Se guarda en la BD y no
     # en media/ porque el disco de Render se borra en cada deploy, y solo se
     # entrega por un endpoint autenticado, nunca con un enlace publico.
-    file_data = models.BinaryField(null=True, blank=True)
+    file_data = EncryptedBinaryField(null=True, blank=True)
     file_name = models.CharField(max_length=255, blank=True, default='')
     file_content_type = models.CharField(max_length=100, blank=True, default='')
 

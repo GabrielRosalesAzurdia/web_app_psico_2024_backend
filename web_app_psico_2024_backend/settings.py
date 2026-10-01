@@ -15,6 +15,7 @@ from datetime import timedelta
 from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,6 +44,17 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-local-dev-only-CHANGE
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _env_bool('DEBUG', default=False)
+
+# RNF-05 (B-2): llave para cifrar en reposo el contenido clinico (ver
+# encrypted_fields.py). En Render va en la variable FIELD_ENCRYPTION_KEY.
+# Si se pierde, los datos cifrados NO se pueden recuperar. La de respaldo
+# es solo para desarrollo local; en produccion falla si no esta definida,
+# para no cifrar nunca con una llave que esta publicada en GitHub.
+FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY')
+if not FIELD_ENCRYPTION_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured('Falta la variable FIELD_ENCRYPTION_KEY.')
+    FIELD_ENCRYPTION_KEY = 'qGs0reKn33BeYRs6sO3d8Fy976PtORqP0CS3h2O7o6M='
 
 ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', [
     'tulip-backend-7265.onrender.com',
@@ -213,9 +225,18 @@ REST_AUTH = {
     'REGISTER_SERIALIZER': 'psico_auth.serializer.UserRegisterSerializer',
 }
 
+# RNF-06: el frontend cierra la sesion tras 15 min sin actividad
+# (InactivityLogout.tsx), pero solo borra los tokens del navegador. Aqui
+# se acorta su vida en el servidor para que un token que quede guardado
+# (p. ej. pestana cerrada sin cerrar sesion) no sirva por dias:
+# - access: igual al periodo de inactividad. El frontend lo renueva solo
+#   con el refresh al recibir un 401, asi que el usuario no lo nota.
+# - refresh: una jornada. Es la duracion maxima de una sesion; el
+#   frontend no guarda el refresh nuevo al renovar, asi que no puede ser
+#   igual de corto sin cortar sesiones activas.
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=10),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=20),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=8),
 }
 
 ACCOUNT_EMAIL_REQUIRED = True

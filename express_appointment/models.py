@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
-
+from web_app_psico_2024_backend.encrypted_fields import EncryptedTextField
 
 class ExpressAppointment(models.Model):
     # Version simplificada de appointments.Appointment: sin status, sin
@@ -28,7 +28,7 @@ class ExpressAppointment(models.Model):
         choices=PlaceType.choices,
         default=PlaceType.CDO
     )
-    notes = models.TextField(blank=True, default='')
+    notes = EncryptedTextField(blank=True, default='')
     hour = models.TimeField()
     date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)

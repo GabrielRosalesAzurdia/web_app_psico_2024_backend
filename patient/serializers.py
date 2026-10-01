@@ -22,6 +22,8 @@ class PatientSerializer(serializers.ModelSerializer):
         # Se excluye el atributo crudo del modelo para no duplicar el dato
         # junto con el campo "external_id" declarado arriba (mismo source).
         exclude = ['external_Id']
+        # RNF-07: la calcula Appointment.save(), no se edita por la API.
+        read_only_fields = ['last_attention_date']
 
     def validate_name(self, value):
         # RF-19: nombre unico (sin distinguir mayus/minus) en toda la BD,
