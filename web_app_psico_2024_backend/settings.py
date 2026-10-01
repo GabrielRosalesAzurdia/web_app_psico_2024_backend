@@ -236,7 +236,7 @@ REST_AUTH = {
 #   igual de corto sin cortar sesiones activas.
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
-    'REFRESH_TOKEN_LIFETIME': timedelta(hours=8),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=2),
 }
 
 ACCOUNT_EMAIL_REQUIRED = True
