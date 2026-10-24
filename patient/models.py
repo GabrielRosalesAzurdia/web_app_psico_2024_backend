@@ -1,3 +1,4 @@
+from business.models import BusinessOwnedModel
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
@@ -5,7 +6,7 @@ from django.utils.timezone import localdate
 from django.db.models.functions import Lower
 from web_app_psico_2024_backend.encrypted_fields import EncryptedBinaryField, EncryptedTextField
 
-class Patient(models.Model):
+class Patient(BusinessOwnedModel):
 
     class PlaceTypes(models.TextChoices):
         CDO = 'CDO', _('CDO')
@@ -75,17 +76,15 @@ class Patient(models.Model):
         on_delete=models.PROTECT,
         related_name='assigned_patients',
     )
-
     class Meta:
         constraints = [
-            # RF-19: el nombre del paciente es unico en toda la tabla, sin
-            # importar mayus/minus ("Juan" y "juan" chocan). Lower('name')
-            # crea un indice unico sobre el nombre convertido a minusculas.
-            # Incluye a los pacientes desactivados (is_active=False), porque
-            # su fila sigue existiendo en la BD (soft delete).
+            # Multi-tenant + RF-19: el nombre es unico DENTRO de cada negocio
+            # (sin importar mayus/minus). Dos negocios distintos si pueden
+            # tener un paciente con el mismo nombre. Incluye desactivados.
             models.UniqueConstraint(
+                'business',
                 Lower('name'),
-                name='unique_patient_name_ci',
+                name='unique_patient_name_per_business',
             ),
         ]
 

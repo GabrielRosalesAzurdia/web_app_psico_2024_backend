@@ -1,3 +1,4 @@
+from business.permissions import get_user_business
 from rest_framework import serializers
 from patient.models import Patient, PatientNote, CaseReassignment, PatientConsent
 
@@ -32,7 +33,8 @@ class PatientSerializer(serializers.ModelSerializer):
         # su nombre sin "chocar" consigo mismo. Esto da un error 400 con
         # mensaje claro; el UniqueConstraint del modelo es solo el respaldo
         # a nivel de base de datos.
-        qs = Patient.objects.filter(name__iexact=value.strip())
+        business = get_user_business(self.context['request'].user)
+        qs = Patient.objects.filter(business=business, name__iexact=value.strip())
         if self.instance is not None:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():

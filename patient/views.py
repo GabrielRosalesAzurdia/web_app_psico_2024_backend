@@ -1,4 +1,5 @@
 from rest_framework.permissions import IsAuthenticated, BasePermission
+from business.mixins import BusinessScopedMixin
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView, DestroyAPIView
 from rest_framework.mixins import UpdateModelMixin
 from django.utils import timezone
@@ -51,7 +52,7 @@ def _active_unless_requested(queryset, query_params):
     return queryset.filter(is_active=True)
 
 
-class PatientCreateApiView(ListCreateAPIView):
+class PatientCreateApiView(BusinessScopedMixin, ListCreateAPIView):
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
 
@@ -61,7 +62,7 @@ class PatientCreateApiView(ListCreateAPIView):
         # los parametros ?includeInactive / ?onlyInactive.
         return _active_unless_requested(Patient.objects.all(), self.request.query_params)
 
-class PatientRetrieveApiView(RetrieveUpdateDestroyAPIView):
+class PatientRetrieveApiView( BusinessScopedMixin,RetrieveUpdateDestroyAPIView):
     # RF-19: el detalle (GET/PUT/PATCH/DELETE /api/v1/patient/<id>/) usa el
     # queryset SIN filtrar por is_active a proposito: asi se puede abrir un
     # paciente desactivado y volver a activarlo (PATCH {"isActive": true}).
@@ -77,7 +78,7 @@ class PatientRetrieveApiView(RetrieveUpdateDestroyAPIView):
         instance.is_active = False
         instance.save()
 
-class PatientListApiView(ListAPIView):
+class PatientListApiView(BusinessScopedMixin, ListAPIView):
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
@@ -89,7 +90,7 @@ class PatientListApiView(ListAPIView):
         # pacientes desactivados salvo ?includeInactive / ?onlyInactive.
         return _active_unless_requested(Patient.objects.all(), self.request.query_params)
 
-class PatientIncompleteFieldsApiView(APIView):
+class PatientIncompleteFieldsApiView(BusinessScopedMixin,APIView):
     # GET /api/v1/patient/incomplete/
     #
     # Detecta pacientes activos con campos clave sin llenar y los expone
@@ -117,8 +118,8 @@ class PatientIncompleteFieldsApiView(APIView):
         texto = str(valor).strip()
         return texto in ('', '0')
 
-    def get(self, request):
-        pacientes = Patient.objects.filter(is_active=True).order_by('name')
+    def get(self,request):
+        pacientes = Patient.objects.filter(business=self.business, is_active=True).order_by('name')
 
         incompletos = []
         for p in pacientes:
