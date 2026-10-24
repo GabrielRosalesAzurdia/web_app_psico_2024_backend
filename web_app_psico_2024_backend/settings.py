@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'drf_spectacular',
     'psico_auth.apps.PsicoAuthConfig',
+    'business.apps.BusinessConfig',
     'profiles.apps.ProfilesConfig',
     'patient.apps.PatientConfig',
     'appointments.apps.AppointmentsConfig',
