@@ -1,6 +1,7 @@
 from rest_framework.generics import ListCreateAPIView, DestroyAPIView
 from rest_framework.permissions import IsAuthenticated, BasePermission
 
+from business.mixins import BusinessScopedMixin
 from note.models import Note
 from note.serializers import NoteSerializer
 
@@ -16,7 +17,7 @@ class IsNoteAuthor(BasePermission):
         return obj.author_id == request.user.id
 
 
-class NoteListCreateApiView(ListCreateAPIView):
+class NoteListCreateApiView(BusinessScopedMixin, ListCreateAPIView):
     # GET /api/v1/note/  -> todas las notas del equipo, mas recientes primero
     #                       (Note.Meta.ordering ya lo hace, sin paginar).
     # POST /api/v1/note/ -> crea una nota; el autor sale del token, no del
@@ -27,10 +28,10 @@ class NoteListCreateApiView(ListCreateAPIView):
     queryset = Note.objects.select_related('author').all()
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        serializer.save(author=self.request.user, business=self.business)
 
 
-class NoteDestroyApiView(DestroyAPIView):
+class NoteDestroyApiView(BusinessScopedMixin, DestroyAPIView):
     # DELETE /api/v1/note/{id}/ -> 204 sin cuerpo; 403 si no sos el autor.
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated, IsNoteAuthor]

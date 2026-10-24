@@ -1,11 +1,12 @@
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
+from business.mixins import BusinessScopedMixin
 from activity.models import Activity
 from activity.serializers import ActivityReadSerializer, ActivitySerializer
 from django.utils.timezone import localdate
 
 
-class ActivityCreateApiView(ListCreateAPIView):
+class ActivityCreateApiView(BusinessScopedMixin, ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
@@ -26,7 +27,7 @@ class ActivityCreateApiView(ListCreateAPIView):
             queryset = queryset.filter(patients=patient)
         return queryset
 
-class ActivityRetrieveApiView(RetrieveUpdateDestroyAPIView):
+class ActivityRetrieveApiView(BusinessScopedMixin, RetrieveUpdateDestroyAPIView):
     queryset = Activity.objects.all()
 
     def get_queryset(self):
@@ -45,7 +46,7 @@ class ActivityRetrieveApiView(RetrieveUpdateDestroyAPIView):
         return ActivityReadSerializer
     permission_classes = [IsAuthenticated]
     
-class ActivityGetPendingApiView(ListAPIView):
+class ActivityGetPendingApiView(BusinessScopedMixin, ListAPIView):
     serializer_class = ActivityReadSerializer
     permission_classes = [IsAuthenticated]
 

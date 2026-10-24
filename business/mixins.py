@@ -12,6 +12,11 @@ class BusinessScopedMixin:
     #     (un id de otro negocio da 404, como si no existiera),
     #  3. al crear, guarda el negocio de la cuenta.
 
+    # Campo por el que se filtra. Los modelos que heredan de
+    # BusinessOwnedModel usan 'business'; para listar usuarios (que tienen
+    # el negocio en su Profile) la vista lo cambia a 'profile__business'.
+    business_lookup = 'business'
+
     @property
     def business(self):
         business = get_user_business(self.request.user)
@@ -24,7 +29,7 @@ class BusinessScopedMixin:
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
-        return queryset.filter(business=self.business)
+        return queryset.filter(**{self.business_lookup: self.business})
 
     def perform_create(self, serializer):
         serializer.save(business=self.business)

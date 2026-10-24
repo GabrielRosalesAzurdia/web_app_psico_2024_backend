@@ -3,8 +3,9 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from appointments.schedule import TimeBlock
+from business.models import BusinessOwnedModel
 
-class Activity(models.Model):
+class Activity(BusinessOwnedModel):
     title = models.CharField(max_length=250, blank=False)
     description =models.TextField(max_length=250, blank=True, default="")
     class StatusType(models.TextChoices):

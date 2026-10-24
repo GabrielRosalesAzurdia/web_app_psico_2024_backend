@@ -119,7 +119,7 @@ class Patient(BusinessOwnedModel):
         return f'{self.name} - {self.phone} - {self.age}'
 
 
-class PatientNote(models.Model):
+class PatientNote(BusinessOwnedModel):
     # RF-26: notas y observaciones generales del expediente clinico, no
     # atadas a una cita puntual (a diferencia del campo `notes` de
     # Appointment, que son las observaciones de ESA cita). Tampoco es RF-24
@@ -150,7 +150,7 @@ class PatientNote(models.Model):
     def __str__(self):
         return f'Nota de {self.patient.name} por {self.author.username} ({self.created_at:%Y-%m-%d %H:%M})'
 
-class CaseReassignment(models.Model):
+class CaseReassignment(BusinessOwnedModel):
     patient = models.ForeignKey(
         Patient, related_name='reassignments', on_delete=models.CASCADE)
     previous_psychologist = models.ForeignKey(
@@ -170,11 +170,11 @@ class CaseReassignment(models.Model):
         return f'{self.patient.name}: {self.previous_psychologist}->{self.new_psychologist}'
 
 
-class ConsentTextVersion(models.Model):
+class ConsentTextVersion(BusinessOwnedModel):
     # RF-33: el texto del consentimiento informado se versiona. Una version
     # publicada no se edita: si cambia el texto se crea una version nueva,
     # asi cada paciente queda ligado al texto exacto que se le entrego.
-    version = models.CharField(max_length=20, unique=True)
+    version = models.CharField(max_length=20)
     content = models.TextField()
     is_current = models.BooleanField(default=False)
     created_by = models.ForeignKey(
@@ -183,12 +183,20 @@ class ConsentTextVersion(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            # Multi-tenant: cada negocio versiona su propio texto, asi que
+            # la version es unica dentro del negocio, no en toda la base.
+            models.UniqueConstraint(
+                fields=['business', 'version'],
+                name='unique_consent_version_per_business',
+            ),
+        ]
 
     def __str__(self):
         return f'Consentimiento informado v{self.version}'
 
 
-class PatientConsent(models.Model):
+class PatientConsent(BusinessOwnedModel):
     # RF-33: escaneado opcional del consentimiento firmado de UN paciente,
     # ligado a la version del texto. Si el paciente firmo o no lo dice
     # Patient.consent_signed, no este modelo.

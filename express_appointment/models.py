@@ -2,8 +2,9 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from web_app_psico_2024_backend.encrypted_fields import EncryptedTextField
+from business.models import BusinessOwnedModel
 
-class ExpressAppointment(models.Model):
+class ExpressAppointment(BusinessOwnedModel):
     # Version simplificada de appointments.Appointment: sin status, sin
     # time_block y sin validacion de horario/fecha (puede registrarse con
     # fecha u hora ya pasada).

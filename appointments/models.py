@@ -4,8 +4,9 @@ from django.utils.translation import gettext_lazy as _
 
 from appointments.schedule import TimeBlock
 from web_app_psico_2024_backend.encrypted_fields import EncryptedTextField
+from business.models import BusinessOwnedModel
 
-class Appointment(models.Model):
+class Appointment(BusinessOwnedModel):
 
     class StatusType(models.TextChoices):
         DONE = 'DONE', _('Hecho')

@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 
+from business.models import BusinessOwnedModel
 
-class Note(models.Model):
+
+class Note(BusinessOwnedModel):
     # RF-24: tablon de recados cortos que ve todo el equipo. No cuelga de
     # un paciente ni de una cita, y no se edita (se borra y se escribe otra).
     author = models.ForeignKey(

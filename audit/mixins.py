@@ -1,4 +1,5 @@
 from audit.models import AuditLog
+from business.permissions import get_user_business
 from patient.models import Patient
 
 # Accion que se registra segun el metodo HTTP. DELETE es modificacion
@@ -25,11 +26,14 @@ class AuditLogMixin:
 
         action = self.audit_action or _ACTIONS_BY_METHOD.get(request.method)
         patient_id = kwargs.get('patient_id')
-        # Solo peticiones exitosas de un usuario autenticado sobre un
-        # paciente que existe (un 401/403/404 no es un acceso real).
+        # Multi-tenant: el registro queda en el negocio de la cuenta.
+        business = get_user_business(request.user)
+        # Solo peticiones exitosas de un usuario con negocio sobre un
+        # paciente de SU negocio (un 401/403/404 no es un acceso real).
         if (action and patient_id and response.status_code < 400
-                and request.user.is_authenticated
-                and Patient.objects.filter(pk=patient_id).exists()):
+                and business is not None
+                and Patient.objects.filter(pk=patient_id, business=business).exists()):
             AuditLog.objects.create(
-                user=request.user, action=action, patient_id=patient_id)
+                business=business, user=request.user,
+                action=action, patient_id=patient_id)
         return response

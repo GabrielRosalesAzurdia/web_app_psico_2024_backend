@@ -2,8 +2,10 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 
+from business.models import BusinessOwnedModel
 
-class AuditLog(models.Model):
+
+class AuditLog(BusinessOwnedModel):
     # RNF-03 (B-1): bitacora de auditoria. Cada consulta, creacion,
     # modificacion o exportacion de informacion clinica deja un registro
     # automatico (ver AuditLogMixin). Solo se agregan filas, nunca se

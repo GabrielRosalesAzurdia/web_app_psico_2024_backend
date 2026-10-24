@@ -2,6 +2,7 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
+from business.mixins import BusinessScopedMixin
 from appointments.models import Appointment
 from appointments.serializers import (
     AppointmentReadSerializer,
@@ -21,7 +22,7 @@ from datetime import date as date_type
 
 class AppointmentPagination(PageNumberPagination):
     page_size = 10
-class AppointmentCreateApiView(ListCreateAPIView):
+class AppointmentCreateApiView(BusinessScopedMixin, ListCreateAPIView):
     serializer_class = AppointmentSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = AppointmentPagination
@@ -94,12 +95,13 @@ class AppointmentCreateApiView(ListCreateAPIView):
         })
 
         serializer.is_valid(raise_exception=True)
-        appointment = serializer.save()
+        # Multi-tenant: el negocio sale de la cuenta, nunca del body.
+        appointment = serializer.save(business=self.business)
         appointment_data = self.get_serializer(appointment).data
 
         return Response(appointment_data, status=HTTP_201_CREATED)
 
-class AppointmentRetrieveApiView(RetrieveUpdateDestroyAPIView):
+class AppointmentRetrieveApiView(BusinessScopedMixin, RetrieveUpdateDestroyAPIView):
     # RF-19: el detalle (GET/PUT/PATCH/DELETE /api/v1/appointment/<id>/) usa
     # el queryset SIN filtrar por is_active a proposito: asi se puede abrir
     # una cita desactivada y reactivarla (PATCH {"isActive": true}).
@@ -118,7 +120,7 @@ class AppointmentRetrieveApiView(RetrieveUpdateDestroyAPIView):
         instance.is_active = False
         instance.save()
 
-class AppointmentGetPendingApiView(ListAPIView):
+class AppointmentGetPendingApiView(BusinessScopedMixin, ListAPIView):
     serializer_class = AppointmentReadSerializer
     permission_classes = [IsAuthenticated]
 
@@ -134,7 +136,7 @@ class AppointmentGetPendingApiView(ListAPIView):
             date__gte=today, status="PENDING", is_active=True
         ).order_by('date')
 
-class DoctorListApiView(ListAPIView):
+class DoctorListApiView(BusinessScopedMixin, ListAPIView):
     # GET /api/v1/appointment/doctors/
     #
     # Alimenta el <select> de "psicologo" del formulario de citas: el
@@ -142,6 +144,8 @@ class DoctorListApiView(ListAPIView):
     # asignable" no es mas que un usuario del sistema.
     serializer_class = DoctorSerializer
     permission_classes = [IsAuthenticated]
+    # Multi-tenant: solo psicologos del negocio de la cuenta.
+    business_lookup = 'profile__business'
 
     # Sin paginacion a proposito: el formulario necesita la lista
     # completa de una sola vez para armar el combo (no se navega
@@ -159,7 +163,7 @@ class DoctorListApiView(ListAPIView):
         ).order_by('first_name', 'last_name')
 
 
-class AppointmentTodayApiView(ListAPIView):
+class AppointmentTodayApiView(BusinessScopedMixin, ListAPIView):
     serializer_class = AppointmentReadSerializer
     permission_classes = [IsAuthenticated]
 
@@ -253,7 +257,7 @@ class DashboardMonthlyProgressApiView(APIView):
         })
 
 
-class AppointmentRemindersApiView(ListAPIView):
+class AppointmentRemindersApiView(BusinessScopedMixin, ListAPIView):
     # GET /api/v1/appointment/reminders/
     #
     # Devuelve las citas que empiezan dentro de los proximos N minutos
@@ -282,6 +286,7 @@ class AppointmentRemindersApiView(ListAPIView):
         # el instante completo directo en el ORM.
         tz = get_current_timezone()
         candidatas = Appointment.objects.filter(
+            business=self.business,
             date__gte=now.date(),
             date__lte=limite.date(),
             status='PENDING',

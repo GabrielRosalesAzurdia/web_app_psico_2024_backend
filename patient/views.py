@@ -142,7 +142,7 @@ class PatientIncompleteFieldsApiView(BusinessScopedMixin,APIView):
         })
 
 
-class PatientNoteListCreateApiView(AuditLogMixin, ListCreateAPIView):
+class PatientNoteListCreateApiView(BusinessScopedMixin, AuditLogMixin, ListCreateAPIView):
     # GET/POST /api/v1/patient/<patient_id>/notes/
     #
     # RF-26: notas clinicas del expediente, independientes de una cita.
@@ -153,13 +153,15 @@ class PatientNoteListCreateApiView(AuditLogMixin, ListCreateAPIView):
     pagination_class = None
 
     def get_queryset(self):
+        # Multi-tenant: paciente de otro negocio -> 404 (no una lista vacia).
+        patient = self.get_business_object(Patient, pk=self.kwargs['patient_id'])
         return PatientNote.objects.filter(
-            patient_id=self.kwargs['patient_id'], is_active=True
+            patient=patient, is_active=True
         ).select_related('author')
 
     def perform_create(self, serializer):
-        patient = get_object_or_404(Patient, pk=self.kwargs['patient_id'])
-        serializer.save(patient=patient, author=self.request.user)
+        patient = self.get_business_object(Patient, pk=self.kwargs['patient_id'])
+        serializer.save(patient=patient, author=self.request.user, business=self.business)
 
 
 class IsPatientNoteAuthor(BasePermission):
@@ -172,14 +174,18 @@ class IsPatientNoteAuthor(BasePermission):
         return obj.author_id == request.user.id
 
 
-class PatientNoteDetailApiView(AuditLogMixin, UpdateModelMixin,DestroyAPIView ):
+class PatientNoteDetailApiView(BusinessScopedMixin, AuditLogMixin, UpdateModelMixin, DestroyAPIView):
     # DELETE /api/v1/patient/<patient_id>/notes/<pk>/ -> 204 sin cuerpo;
     # 403 si no sos el autor. No estaba en el alcance original de RF-26
     # ("acumulativas, no se borran"), pero hace falta para poder limpiar
     # una nota cargada por error sin dejarla para siempre en el expediente.
     serializer_class = PatientNoteSerializer
     permission_classes = [IsAuthenticated, IsPatientNoteAuthor, IsProfessional]
-    queryset = PatientNote.objects.all()
+    def get_queryset(self):
+        # La nota debe ser del paciente de la URL (antes se ignoraba
+        # patient_id); el negocio lo agrega el mixin.
+        return PatientNote.objects.filter(patient_id=self.kwargs['patient_id'])
+
     def patch(self, request, *args, **kwargs):
         return self.partial_update(request, *args, **kwargs)
     
@@ -189,7 +195,7 @@ class PatientNoteDetailApiView(AuditLogMixin, UpdateModelMixin,DestroyAPIView ):
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save()
-class PatientFileApiView(AuditLogMixin, APIView):
+class PatientFileApiView(BusinessScopedMixin, AuditLogMixin, APIView):
     # GET /api/v1/patient/<patient_id>/file/
     #
     # Ficha unica del paciente: junta en una sola respuesta sus datos
@@ -205,7 +211,7 @@ class PatientFileApiView(AuditLogMixin, APIView):
     permission_classes = [IsAuthenticated, IsProfessional]
 
     def get(self, request, patient_id):
-        patient = get_object_or_404(Patient, pk=patient_id)
+        patient = self.get_business_object(Patient, pk=patient_id)
 
         notes = patient.clinical_notes.filter(is_active=True).select_related('author')
 
@@ -227,7 +233,7 @@ class PatientFileApiView(AuditLogMixin, APIView):
                 if assigned_psychologist else None
             ),
         })
-class PatientDoctorApiView(APIView):
+class PatientDoctorApiView(BusinessScopedMixin, APIView):
     # GET /api/v1/patient/<patient_id>/doctors/
     #
     # RF-30 (B-2): lista, para un paciente dado, todos los profesionales
@@ -237,7 +243,7 @@ class PatientDoctorApiView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, patient_id):
-        get_object_or_404(Patient, pk=patient_id)
+        self.get_business_object(Patient, pk=patient_id)
 
         # RF-19: igual que en PatientFileApiView, solo citas activas
         # (una cita desactivada no cuenta como "atencion").
@@ -249,7 +255,7 @@ class PatientDoctorApiView(APIView):
         return Response(UserSerializer(doctors, many=True).data)
 
 
-class PatientReassignApiView(APIView):
+class PatientReassignApiView(BusinessScopedMixin, APIView):
     # POST /api/v1/patient/<patient_id>/reassign/
     #
     # RF-31 (B-2): reasigna el psicologo responsable del paciente. El
@@ -260,7 +266,7 @@ class PatientReassignApiView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, patient_id):
-        patient = get_object_or_404(Patient, pk=patient_id)
+        patient = self.get_business_object(Patient, pk=patient_id)
 
         new_psychologist_id = request.data.get('new_psychologist')
         reason = (request.data.get('reason') or '').strip()
@@ -272,10 +278,13 @@ class PatientReassignApiView(APIView):
             return Response(
                 {'reason': 'El motivo del traspaso es requerido.'}, status=400)
 
+        # Multi-tenant: solo se puede asignar una cuenta del mismo negocio.
         new_psychologist = get_object_or_404(
-            get_user_model(), pk=new_psychologist_id)
+            get_user_model(), pk=new_psychologist_id,
+            profile__business=self.business)
 
         CaseReassignment.objects.create(
+            business=self.business,
             patient=patient,
             previous_psychologist=patient.assigned_psychologist,
             new_psychologist=new_psychologist,
@@ -289,7 +298,7 @@ class PatientReassignApiView(APIView):
         return Response(PatientSerializer(patient).data)
 
 
-class PatientReassignmentHistoryApiView(ListAPIView):
+class PatientReassignmentHistoryApiView(BusinessScopedMixin, ListAPIView):
     # GET /api/v1/patient/<patient_id>/reassignments/
     #
     # RF-31 (B-2): historial de traspasos del paciente, mas reciente
@@ -299,12 +308,12 @@ class PatientReassignmentHistoryApiView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        get_object_or_404(Patient, pk=self.kwargs['patient_id'])
+        self.get_business_object(Patient, pk=self.kwargs['patient_id'])
         return CaseReassignment.objects.filter(
             patient_id=self.kwargs['patient_id'])
 
 
-class PatientConsentDocumentApiView(AuditLogMixin, APIView):
+class PatientConsentDocumentApiView(BusinessScopedMixin, AuditLogMixin, APIView):
     # GET /api/v1/patient/<patient_id>/consent/document/
     #
     # RF-33 (B-2): genera el PDF del consentimiento informado con los datos
@@ -314,9 +323,10 @@ class PatientConsentDocumentApiView(AuditLogMixin, APIView):
     permission_classes = [IsAuthenticated, IsProfessional]
 
     def get(self, request, patient_id):
-        patient = get_object_or_404(Patient, pk=patient_id)
+        patient = self.get_business_object(Patient, pk=patient_id)
 
-        text_version = ConsentTextVersion.objects.filter(is_current=True).first()
+        text_version = ConsentTextVersion.objects.filter(
+            business=self.business, is_current=True).first()
         if text_version is None:
             return Response(
                 {'detail': 'No hay una version vigente del consentimiento.'},
@@ -375,7 +385,7 @@ class PatientConsentDocumentApiView(AuditLogMixin, APIView):
         return response
 
 
-class PatientConsentUploadApiView(AuditLogMixin, APIView):
+class PatientConsentUploadApiView(BusinessScopedMixin, AuditLogMixin, APIView):
     # POST /api/v1/patient/<patient_id>/consent/upload/
     #
     # RF-33 (B-3): carga el escaneado del consentimiento firmado (PDF o
@@ -387,7 +397,7 @@ class PatientConsentUploadApiView(AuditLogMixin, APIView):
     ALLOWED_CONTENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 
     def post(self, request, patient_id):
-        patient = get_object_or_404(Patient, pk=patient_id)
+        patient = self.get_business_object(Patient, pk=patient_id)
 
         uploaded = request.FILES.get('file')
         if uploaded is None:
@@ -396,13 +406,15 @@ class PatientConsentUploadApiView(AuditLogMixin, APIView):
             return Response(
                 {'file': 'Solo se permiten archivos PDF, JPG o PNG.'}, status=400)
 
-        text_version = ConsentTextVersion.objects.filter(is_current=True).first()
+        text_version = ConsentTextVersion.objects.filter(
+            business=self.business, is_current=True).first()
         if text_version is None:
             return Response(
                 {'detail': 'No hay una version vigente del consentimiento.'},
                 status=400)
 
         consent = PatientConsent.objects.create(
+            business=self.business,
             patient=patient,
             text_version=text_version,
             created_by=request.user,
@@ -418,7 +430,7 @@ class PatientConsentUploadApiView(AuditLogMixin, APIView):
         return Response(PatientConsentSerializer(consent).data, status=201)
 
 
-class PatientConsentFileApiView(AuditLogMixin, APIView):
+class PatientConsentFileApiView(BusinessScopedMixin, AuditLogMixin, APIView):
     # GET /api/v1/patient/<patient_id>/consent/<pk>/file/
     #
     # RF-33 (B-3): descarga el escaneado. Es la unica forma de obtenerlo y
@@ -427,7 +439,7 @@ class PatientConsentFileApiView(AuditLogMixin, APIView):
     permission_classes = [IsAuthenticated, IsProfessional]
 
     def get(self, request, patient_id, pk):
-        consent = get_object_or_404(
+        consent = self.get_business_object(
             PatientConsent, pk=pk, patient_id=patient_id)
         if not consent.file_data:
             return Response(
@@ -454,7 +466,7 @@ def _pdf_table(rows, col_widths, header=True):
     return table
 
 
-class PatientExportApiView(AuditLogMixin, APIView):
+class PatientExportApiView(BusinessScopedMixin, AuditLogMixin, APIView):
     # GET /api/v1/patient/<patient_id>/export/
     #
     # RF-34 (B-1): copia imprimible del expediente completo en PDF: datos
@@ -466,7 +478,7 @@ class PatientExportApiView(AuditLogMixin, APIView):
     permission_classes = [IsAuthenticated, IsProfessional]
 
     def get(self, request, patient_id):
-        patient = get_object_or_404(Patient, pk=patient_id)
+        patient = self.get_business_object(Patient, pk=patient_id)
 
         notes = patient.clinical_notes.filter(is_active=True).select_related('author')
         appointments = Appointment.objects.filter(

@@ -2,11 +2,12 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 
 from audit.models import AuditLog
+from business.mixins import BusinessScopedMixin
 from audit.serializers import AuditLogSerializer
 from psico_auth.permissions import IsAdministrator
 
 
-class AuditLogListApiView(ListAPIView):
+class AuditLogListApiView(BusinessScopedMixin, ListAPIView):
     # GET /api/v1/audit/
     #
     # RNF-03 (B-2): consulta de la bitacora, mas reciente primero
