@@ -5,6 +5,7 @@ from django.utils.timezone import localdate
 from django.db.models import Count
 from django.db.models.functions import TruncMonth, ExtractWeekDay
 from io import BytesIO
+from xml.sax.saxutils import escape
 import calendar
 import qrcode
 from PIL import Image as PILImage
@@ -14,6 +15,7 @@ from appointments.models import Appointment
 from express_appointment.models import ExpressAppointment
 from activity.models import Activity
 from patient.models import Patient
+from business.mixins import BusinessScopedMixin
 from django.core import signing
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -24,8 +26,17 @@ from rest_framework.response import Response
 
 _DIAS_SEMANA = {1: 'Domingo', 2: 'Lunes', 3: 'Martes', 4: 'Miércoles', 5: 'Jueves', 6: 'Viernes', 7: 'Sábado'}
 
-def _apply_filters(queryset, params):
+# Firma de los reportes emitidos antes de multi-tenant (sus tokens no
+# traen el negocio).
+_EMISOR_ANTERIOR = 'Daniel Padnos Wellness Center'
+
+def _apply_filters(queryset, params, business):
     """Aplica filtros combinables al queryset de Appointment."""
+    # Multi-tenant: el negocio es obligatorio aqui. Todas las citas de los
+    # reportes pasan por esta funcion, asi que con esta linea ninguna vista
+    # puede contar citas de otro negocio.
+    queryset = queryset.filter(business=business)
+
     # RF-19 (soft delete): una cita "eliminada" no se borra de la BD, solo
     # queda con is_active=False. Los reportes y estadisticas NUNCA deben
     # contar esas citas (falsearian totales, porcentajes y graficas), y aqui
@@ -76,10 +87,11 @@ def _apply_filters(queryset, params):
 
     return queryset
 
-class MonthlyReportApiView(APIView):
+class MonthlyReportApiView(BusinessScopedMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        business = self.business
         today = localdate()
         year  = int(request.query_params.get('year', today.year))
         month = int(request.query_params.get('month', today.month))
@@ -90,13 +102,15 @@ class MonthlyReportApiView(APIView):
         # afectaba al PDF real, solo al chequeo previo de /monthly-stats/).
         appointments = _apply_filters(
             Appointment.objects.filter(date__year=year, date__month=month),
-            request.query_params
+            request.query_params,
+            business,
         )
         total = appointments.count()
 
         # RF-18: actividades del mes (con su horario), para que el reporte
         # no muestre solo el horario de citas.
-        activities = Activity.objects.filter(date__year=year, date__month=month)
+        activities = Activity.objects.filter(
+            business=business, date__year=year, date__month=month)
         doctor_id = request.query_params.get('doctor_id')
         if doctor_id:
             activities = activities.filter(doctors__id=doctor_id)
@@ -106,7 +120,7 @@ class MonthlyReportApiView(APIView):
         # Citas express del mes (RF nueva: tabla propia en el reporte).
         # is_active=True fijo, mismo criterio de soft delete que _apply_filters.
         express = ExpressAppointment.objects.filter(
-            date__year=year, date__month=month, is_active=True
+            business=business, date__year=year, date__month=month, is_active=True
         )
         if doctor_id:
             express = express.filter(doctor_id=doctor_id)
@@ -122,7 +136,8 @@ class MonthlyReportApiView(APIView):
         # RF-19: ademas de descartar citas inactivas (ya filtradas arriba),
         # se descartan pacientes desactivados: is_active=True evita contarlos
         # en las distribuciones por genero / edad / grado del reporte.
-        patients = Patient.objects.filter(id__in=patient_ids, is_active=True)
+        patients = Patient.objects.filter(
+            business=business, id__in=patient_ids, is_active=True)
 
         # Género
         gender_dist = patients.values('gender').annotate(count=Count('id'))
@@ -159,7 +174,9 @@ class MonthlyReportApiView(APIView):
         sub_style   = ParagraphStyle('sub', parent=styles['Normal'], fontSize=10, textColor=colors.grey, spaceAfter=20)
 
         month_name = calendar.month_name[month]
-        elements.append(Paragraph("Daniel Padnos Wellness Center", title_style))
+        # Paragraph interpreta etiquetas tipo HTML: escape() evita que un
+        # nombre con "&" o "<" rompa el PDF.
+        elements.append(Paragraph(escape(business.name), title_style))
         elements.append(Paragraph(f"Reporte Mensual — {month_name} {year}", title_style))
         elements.append(Paragraph(
             f"Generado: {today}  |  Total de citas: {total}  |  "
@@ -324,6 +341,9 @@ class MonthlyReportApiView(APIView):
         #Token firmado con datos del reporte
 
         token_data ={
+            # Multi-tenant: el negocio emisor queda firmado en el token, asi
+            # la verificacion publica muestra quien emitio el reporte.
+            'business': business.name,
             'year':year,
             'month':month,
             'total': total,
@@ -347,7 +367,7 @@ class MonthlyReportApiView(APIView):
         elements.append(Spacer(1,6))
         elements.append(Paragraph(
             f"Documento generado automaticamente por el sistema.<br/>"
-            f"Daniel Padnos Wellness Center -{today}",
+            f"{escape(business.name)} -{today}",
             ParagraphStyle('firma', parent=styles['Normal'], fontSize=8, textColor=colors.grey)
         ))
         
@@ -366,7 +386,7 @@ class ReportVerifyApiView(APIView):
             data = signing.loads(token, max_age=60*60*24*365)
             return Response({
                 'valid':True,
-                'issued_by': 'Daniel Padnos Wellness Center',
+                'issued_by': data.get('business', _EMISOR_ANTERIOR),
                 'year':data['year'],
                 'month':data['month'],
                 'total_appoinments':data['total'],
@@ -382,11 +402,13 @@ class ReportVerifyApiView(APIView):
             },status=400
             )
 
-class MonthlyStatsApiView(APIView):
+class MonthlyStatsApiView(BusinessScopedMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        queryset = _apply_filters(Appointment.objects.all(), request.query_params)
+        business = self.business
+        queryset = _apply_filters(
+            Appointment.objects.all(), request.query_params, business)
 
         total     = queryset.count()
         done      = queryset.filter(status='DONE').count()
@@ -398,7 +420,7 @@ class MonthlyStatsApiView(APIView):
         date_from = request.query_params.get('date_from')
         date_to   = request.query_params.get('date_to')
         doctor_id = request.query_params.get('doctor_id')
-        activities_qs = Activity.objects.all()
+        activities_qs = Activity.objects.filter(business=business)
         if date_from:
             activities_qs = activities_qs.filter(date__gte=date_from)
         if date_to:
@@ -411,7 +433,8 @@ class MonthlyStatsApiView(APIView):
         patient_ids = queryset.values_list('patient_id', flat=True).distinct()
         # RF-19: se excluyen los pacientes desactivados de las estadisticas
         # (mismo motivo que en MonthlyReportApiView).
-        patients    = Patient.objects.filter(id__in=patient_ids, is_active=True)
+        patients    = Patient.objects.filter(
+            business=business, id__in=patient_ids, is_active=True)
 
         gender_dist = list(patients.values('gender').annotate(count=Count('id')).order_by('-count'))
         grade_dist  = list(patients.values('grade').annotate(count=Count('id')).order_by('-count'))
@@ -448,11 +471,12 @@ class MonthlyStatsApiView(APIView):
         })
 
 
-class ScheduleStatsApiView(APIView):
+class ScheduleStatsApiView(BusinessScopedMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        queryset = _apply_filters(Appointment.objects.all(), request.query_params)
+        queryset = _apply_filters(
+            Appointment.objects.all(), request.query_params, self.business)
 
         # Distribucion por hora
         by_hour = list(
@@ -498,15 +522,16 @@ class ScheduleStatsApiView(APIView):
             'by_doctor': by_doctor,
             'by_place': by_place,
         })
-class PsychologistPatientsApiView(APIView):
+class PsychologistPatientsApiView(BusinessScopedMixin, APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         doctor_id= request.query_params.get('doctor_id')
         if not doctor_id:
             return Response({'detail': 'doctor_id es requerido.'}, status =400)
-            
+
         count = Patient.objects.filter(
+            business=self.business,
             assigned_psychologist_id = doctor_id,
             is_active =True,
         ).count()
@@ -516,13 +541,16 @@ class PsychologistPatientsApiView(APIView):
             'assigned_patients': count,
         })
         
-class PatientDoctorsApiView(APIView):
+class PatientDoctorsApiView(BusinessScopedMixin, APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request, patient_id):
+        # Paciente de otro negocio -> 404, igual que en el resto de la API.
+        self.get_business_object(Patient, pk=patient_id)
         queryset = _apply_filters(
             Appointment.objects.filter(patient_id =patient_id),
             request.query_params,
+            self.business,
         )
         by_doctor =[
         {

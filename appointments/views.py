@@ -170,14 +170,16 @@ class AppointmentTodayApiView(BusinessScopedMixin, ListAPIView):
         # (is_active=True fijo, sin opcion de incluirlas). localdate() en
         # vez de now().date(): ver comentario en AppointmentGetPendingApiView.
         return Appointment.objects.filter(date=localdate(), is_active=True).order_by('hour')
-class DashboardTodayApiView(APIView):
+class DashboardTodayApiView(BusinessScopedMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         today = localdate()
         # RF-19: los contadores del dashboard solo cuentan citas activas;
         # las desactivadas (soft delete) no deben inflar los totales.
-        citas_hoy = Appointment.objects.filter(date=today, is_active=True)
+        # Multi-tenant: solo citas del negocio de la cuenta.
+        citas_hoy = Appointment.objects.filter(
+            business=self.business, date=today, is_active=True)
 
         pendientes = citas_hoy.filter(status='PENDING')
         serializer = AppointmentReadSerializer(pendientes, many=True)
@@ -190,11 +192,13 @@ class DashboardTodayApiView(APIView):
             'pending_appointments': serializer.data,
         })
 
-class DashboardMonthlyProgressApiView(APIView):
+class DashboardMonthlyProgressApiView(BusinessScopedMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         today = localdate()
+        # Multi-tenant: base de las dos graficas, solo del negocio.
+        citas = Appointment.objects.filter(business=self.business, is_active=True)
 
         # Primer día de hace 2 meses para traer 3 meses en total
         m = today.month - 2
@@ -221,8 +225,8 @@ class DashboardMonthlyProgressApiView(APIView):
         # RF-19: is_active=True excluye del gráfico las citas desactivadas
         # (soft delete); lo mismo aplica a "daily_cancelled" mas abajo.
         daily = (
-            Appointment.objects
-            .filter(date__gte=three_months_ago, date__lt=next_month_start, status='DONE', is_active=True)
+            citas
+            .filter(date__gte=three_months_ago, date__lt=next_month_start, status='DONE')
             .annotate(day=TruncDay('date'))
             .values('day')
             .annotate(count=Count('id'))
@@ -237,8 +241,8 @@ class DashboardMonthlyProgressApiView(APIView):
         # no se compara entre meses). Antes esta clave ni siquiera se
         # enviaba: la línea "Canceladas" del dashboard quedaba en cero.
         daily_cancelled = (
-            Appointment.objects
-            .filter(date__year=today.year, date__month=today.month, status='CANCELLED', is_active=True)
+            citas
+            .filter(date__year=today.year, date__month=today.month, status='CANCELLED')
             .annotate(day=TruncDay('date'))
             .values('day')
             .annotate(count=Count('id'))

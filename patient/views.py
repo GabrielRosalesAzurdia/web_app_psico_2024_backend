@@ -339,7 +339,7 @@ class PatientConsentDocumentApiView(BusinessScopedMixin, AuditLogMixin, APIView)
         styles = getSampleStyleSheet()
         elements = []
 
-        elements.append(Paragraph("Daniel Padnos Wellness Center", styles['Title']))
+        elements.append(Paragraph(escape(self.business.name), styles['Title']))
         elements.append(Paragraph("Consentimiento informado", styles['Title']))
         elements.append(Paragraph(
             f"Version {escape(text_version.version)} - Generado el {localdate():%d/%m/%Y}",
@@ -500,7 +500,7 @@ class PatientExportApiView(BusinessScopedMixin, AuditLogMixin, APIView):
         normal = styles['Normal']
         elements = []
 
-        elements.append(Paragraph("Daniel Padnos Wellness Center", styles['Title']))
+        elements.append(Paragraph(escape(self.business.name), styles['Title']))
         elements.append(Paragraph("Expediente del paciente", styles['Title']))
         elements.append(Paragraph(
             f"Generado el {timezone.localtime():%d/%m/%Y %H:%M} por {user_name(request.user)}",
