@@ -26,9 +26,6 @@ class BusinessOwnedModel(models.Model):
         on_delete=models.PROTECT,
         related_name='+',
         editable=False,
-        # TEMPORAL: null=True solo para poder migrar los datos existentes.
-        # Despues de asignarlos a El Patojismo se quita.
-        null=True,
     )
 
     class Meta:
