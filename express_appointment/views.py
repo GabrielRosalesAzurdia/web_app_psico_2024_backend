@@ -62,9 +62,7 @@ class ExpressAppointmentListCreateApiView(BusinessScopedMixin, ListCreateAPIView
         return queryset
 
     def post(self, request: Request, format=None, *args, **kwargs):
-        serializer_class = self.get_serializer_class()
-
-        serializer = serializer_class(data={
+        serializer = self.get_serializer(data={
             'patient': request.data.get('patient'),
             'doctor': request.data.get('doctor'),
             'hour': request.data.get('hour'),

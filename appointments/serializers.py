@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils.timezone import localdate
 from appointments.models import Appointment
 from appointments.schedule import ScheduleError, resolve_hour
-
+from business.serializers import BusinessScopedSerializerMixin
 from patient.serializers import PatientSerializer
 
 from psico_auth.serializer import UserSerializer
@@ -33,7 +33,13 @@ class DoctorSerializer(serializers.Serializer):
         return obj.get_full_name() or obj.username
 
 
-class AppointmentSerializer(serializers.ModelSerializer):
+class AppointmentSerializer(BusinessScopedSerializerMixin, serializers.ModelSerializer):
+    # Multi-tenant: paciente y psicologo solo del negocio de la cuenta.
+    business_scoped_fields = {
+        'patient': 'business',
+        'doctor': 'profile__business',
+    }
+
     # created_by = serializers.HiddenField(
     #     default=serializers.CurrentUserDefault()
     # )

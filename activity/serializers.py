@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from business.serializers import BusinessScopedSerializerMixin
 
 from appointments.schedule import ScheduleError, resolve_activity_hours
 from activity.models import Activity
@@ -7,8 +8,14 @@ from patient.serializers import PatientSerializer
 from psico_auth.serializer import UserSerializer
 
 
-class ActivitySerializer(serializers.ModelSerializer):
-    patients = serializers.PrimaryKeyRelatedField(
+class ActivitySerializer(BusinessScopedSerializerMixin, serializers.ModelSerializer):
+    # Multi-tenant: pacientes y psicologos solo del negocio de la cuenta.
+    business_scoped_fields = {
+        'patients': 'business',
+        'doctors': 'profile__business',
+    }
+
+    patients =serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=Patient.objects.all(),
         required=False,
