@@ -1,4 +1,8 @@
 from business.permissions import get_user_business
+from rest_framework.exceptions import PermissionDenied
+from psico_auth.enums import GroupName
+from psico_auth.permissions import IsAdministrator, has_role
+
 from rest_framework import serializers
 from patient.models import Patient, PatientNote, CaseReassignment, PatientConsent
 
@@ -41,6 +45,16 @@ class PatientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 'Ya existe un paciente registrado con este nombre.'
             )
+        return value
+
+    def validate_is_active(self, value):
+        # Roles: activar o desactivar un paciente es solo del administrador.
+        # DELETE ya lo exige en la vista; esto cierra el otro camino:
+        # PATCH {"isActive": false} (o true para reactivarlo).
+        current = self.instance.is_active if self.instance else True
+        user = self.context['request'].user
+        if value != current and not has_role(user, GroupName.ADMINISTRATOR):
+            raise PermissionDenied(IsAdministrator.message)
         return value
 
     def validate(self, data):

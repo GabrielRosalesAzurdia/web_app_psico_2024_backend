@@ -3,9 +3,11 @@ from django.contrib.auth.models import Group
 from django.utils.translation import gettext as _
 
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from dj_rest_auth.registration.serializers import RegisterSerializer
 
+from business.permissions import HasActiveBusiness, get_user_business
 from profiles.models import Profile
 from psico_auth.enums import GroupName
 
@@ -37,9 +39,15 @@ class UserRegisterSerializer(RegisterSerializer):
     def save(self, request):
         phone_number = self.validated_data.pop('phone_number')
 
-        # RNF-02 (B-1): quien se registra entra con el rol de menos permisos;
-        # un administrador lo cambia a profesional desde el admin si aplica.
-        group, _ = Group.objects.get_or_create(name=GroupName.RECEPTION.value)
+        # Multi-tenant: la cuenta nueva queda en el negocio del
+        # administrador que la crea. Nunca se lee del body.
+        business = get_user_business(request.user)
+        if business is None:
+            raise PermissionDenied(HasActiveBusiness.message)
+
+        # El administrador del negocio crea cuentas de psicologos.
+        group, _ = Group.objects.get_or_create(
+            name=GroupName.PROFESSIONAL.value)
 
         user = super().save(request)
         user.groups.add(group)
@@ -48,9 +56,10 @@ class UserRegisterSerializer(RegisterSerializer):
         # rompia el registro con IntegrityError (UNIQUE user_id).
         Profile.objects.update_or_create(
             user=user,
-            defaults={"phone_number": phone_number})
+            defaults={'phone_number': phone_number, 'business': business})
 
         return user
+
 
 class UserSerializer(serializers.Serializer):
     id = serializers.IntegerField()

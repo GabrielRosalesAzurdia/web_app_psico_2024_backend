@@ -1,17 +1,18 @@
 from dj_rest_auth import views as dra_views
 from dj_rest_auth.jwt_auth import get_refresh_view
-from dj_rest_auth.registration.views import RegisterView
 
 from django.urls import path
 
 from rest_framework_simplejwt.views import TokenVerifyView
 
-from psico_auth.views import password_reset_redirect
+from psico_auth.views import password_reset_redirect, ProfessionalAccountCreateApiView
 
 urlpatterns = [
     path('login/', dra_views.LoginView.as_view()),
 
-    path('registration/', RegisterView.as_view()),
+    # Multi-tenant: no hay registro publico. El administrador del negocio
+    # crea aqui cuentas de psicologos para su negocio (ver la vista).
+    path('registration/', ProfessionalAccountCreateApiView.as_view()),
 
     path('token/verify/', TokenVerifyView.as_view()),
     path('token/refresh/', get_refresh_view().as_view()),

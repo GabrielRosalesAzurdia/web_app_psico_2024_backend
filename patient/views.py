@@ -25,7 +25,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
-from psico_auth.permissions import IsProfessional
+from psico_auth.permissions import IsProfessional, IsAdministrator
 
 def _active_unless_requested(queryset, query_params):
     """RF-19 (soft delete): "eliminar" un paciente NO borra su fila de la base
@@ -69,6 +69,14 @@ class PatientRetrieveApiView( BusinessScopedMixin,RetrieveUpdateDestroyAPIView):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        permissions = super().get_permissions()
+        # Roles: desactivar un paciente (DELETE = soft delete) es solo
+        # del administrador. Ver y editar siguen abiertos a todos los roles.
+        if self.request.method == 'DELETE':
+            permissions.append(IsAdministrator())
+        return permissions
 
     def perform_destroy(self, instance):
         # RF-19: DELETE no borra la fila (se perderia el historial de citas
@@ -263,7 +271,8 @@ class PatientReassignApiView(BusinessScopedMixin, APIView):
     # CaseReassignment antes de tocar Patient.assigned_psychologist, para
     # que nunca pueda cambiar sin dejar rastro en el historial. No toca
     # citas anteriores (RF-30).
-    permission_classes = [IsAuthenticated]
+    # Roles: reasignar es una decision de coordinacion, solo administrador.
+    permission_classes = [IsAuthenticated, IsAdministrator]
 
     def post(self, request, patient_id):
         patient = self.get_business_object(Patient, pk=patient_id)
