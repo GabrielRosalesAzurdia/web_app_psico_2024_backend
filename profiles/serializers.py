@@ -7,6 +7,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(source='profile.image', required=False)
     group = serializers.SerializerMethodField(read_only=True)
     roles = serializers.SerializerMethodField(read_only=True)
+    business_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = get_user_model()
@@ -20,6 +21,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'image',
             'group',
             'roles',
+            'business_name',
         ]
 
         extra_kwargs = {
@@ -37,6 +39,15 @@ class ProfileSerializer(serializers.ModelSerializer):
         # muestre u oculte secciones. "group" se queda por compatibilidad.
 
         return [group.name for group in obj.groups.all()]
+
+    @staticmethod
+    def get_business_name(obj) -> str | None:
+        # Multi-tenant: nombre del negocio de la cuenta, para mostrarlo en
+        # el encabezado del frontend. Solo lectura: el negocio lo asigna
+        # el superusuario en el admin, nunca se cambia desde aqui.
+        profile = getattr(obj, 'profile', None)
+        business = getattr(profile, 'business', None)
+        return business.name if business else None
 
     @staticmethod
     def update_profile(instance, data):
