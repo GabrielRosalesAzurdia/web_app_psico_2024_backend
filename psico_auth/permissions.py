@@ -1,8 +1,13 @@
+from django.contrib.auth.models import Permission
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from psico_auth.enums import GroupName
 from psico_auth.models import StaffPermission
 
+
+# Codigos de todas las casillas. Es la lista permitida: la API no acepta
+# ningun otro permiso (ej. auth.change_user), asi nadie se da mas poder.
+STAFF_PERMISSION_CODENAMES = [c for c, _ in StaffPermission._meta.permissions]
 
 # Casillas que recibe por defecto una cuenta nueva creada desde
 # /auth/registration/ (lo que antes daba el rol profesional).
@@ -34,6 +39,12 @@ class IsAdministrator(BasePermission):
         return has_role(request.user, GroupName.ADMINISTRATOR)
 
 
+def is_business_administrator(user):
+    # Administrador del negocio (o superusuario). Sus casillas vienen del
+    # grupo, y solo el superusuario lo crea o lo cambia.
+    return user.is_superuser or has_role(user, GroupName.ADMINISTRATOR)
+
+
 def has_staff_permission(user, codename):
     # True si la casilla esta marcada en la cuenta o en uno de sus grupos.
     if not user or not user.is_authenticated:
@@ -48,6 +59,14 @@ def get_staff_permissions(user):
         for codename, _ in StaffPermission._meta.permissions
         if has_staff_permission(user, codename)
     ]
+
+
+def set_staff_permissions(user, codenames):
+    # Deja en la cuenta exactamente esas casillas. Solo toca permisos del
+    # catalogo; cualquier otro permiso que tenga la cuenta se respeta.
+    catalog = Permission.objects.filter(content_type__app_label='psico_auth')
+    user.user_permissions.remove(*catalog)
+    user.user_permissions.add(*catalog.filter(codename__in=codenames))
 
 
 def staff_permission(codename, writes_only=False):

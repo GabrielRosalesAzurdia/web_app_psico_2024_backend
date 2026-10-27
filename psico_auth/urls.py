@@ -5,14 +5,25 @@ from django.urls import path
 
 from rest_framework_simplejwt.views import TokenVerifyView
 
-from psico_auth.views import password_reset_redirect, ProfessionalAccountCreateApiView
+from psico_auth.views import (
+    password_reset_redirect,
+    ProfessionalAccountCreateApiView,
+    StaffListApiView,
+    StaffPermissionCatalogApiView,
+    StaffPermissionsUpdateApiView,
+)
 
 urlpatterns = [
     path('login/', dra_views.LoginView.as_view()),
 
     # Multi-tenant: no hay registro publico. El administrador del negocio
-    # crea aqui cuentas de psicologos para su negocio (ver la vista).
+    # crea aqui cuentas del personal para su negocio (ver la vista).
     path('registration/', ProfessionalAccountCreateApiView.as_view()),
+
+    # Casillas del personal (solo el administrador del negocio).
+    path('staff/', StaffListApiView.as_view()),
+    path('staff/permissions/', StaffPermissionCatalogApiView.as_view()),
+    path('staff/<int:pk>/permissions/', StaffPermissionsUpdateApiView.as_view()),
 
     path('token/verify/', TokenVerifyView.as_view()),
     path('token/refresh/', get_refresh_view().as_view()),
