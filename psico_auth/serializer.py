@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.utils.translation import gettext as _
 
 from rest_framework import serializers
@@ -10,6 +10,7 @@ from dj_rest_auth.registration.serializers import RegisterSerializer
 from business.permissions import HasActiveBusiness, get_user_business
 from profiles.models import Profile
 from psico_auth.enums import GroupName
+from psico_auth.permissions import PROFESSIONAL_DEFAULT_PERMISSIONS
 
 
 class UserRegisterSerializer(RegisterSerializer):
@@ -51,6 +52,11 @@ class UserRegisterSerializer(RegisterSerializer):
 
         user = super().save(request)
         user.groups.add(group)
+        # Casillas por defecto de un profesional. (Despues el administrador
+        # las va a elegir al crear la cuenta.)
+        user.user_permissions.add(*Permission.objects.filter(
+            content_type__app_label='psico_auth',
+            codename__in=PROFESSIONAL_DEFAULT_PERMISSIONS))
         # profiles/signals.py ya crea un Profile vacio en el post_save del
         # User (get_or_create); usar create() aca duplicaba la fila y
         # rompia el registro con IntegrityError (UNIQUE user_id).

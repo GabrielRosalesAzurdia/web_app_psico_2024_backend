@@ -25,7 +25,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
-from psico_auth.permissions import IsProfessional, IsAdministrator
+from psico_auth.permissions import staff_permission
 
 def _active_unless_requested(queryset, query_params):
     """RF-19 (soft delete): "eliminar" un paciente NO borra su fila de la base
@@ -54,7 +54,8 @@ def _active_unless_requested(queryset, query_params):
 
 class PatientCreateApiView(BusinessScopedMixin, ListCreateAPIView):
     serializer_class = PatientSerializer
-    permission_classes = [IsAuthenticated]
+    # Casilla: ver la lista es para todos; crear exige manage_patients.
+    permission_classes = [IsAuthenticated, staff_permission('manage_patients', writes_only=True)]
 
     def get_queryset(self):
         # GET /api/v1/patient/  -> lista para el frontend.
@@ -72,10 +73,15 @@ class PatientRetrieveApiView( BusinessScopedMixin,RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         permissions = super().get_permissions()
-        # Roles: desactivar un paciente (DELETE = soft delete) es solo
-        # del administrador. Ver y editar siguen abiertos a todos los roles.
-        if self.request.method == 'DELETE':
-            permissions.append(IsAdministrator())
+        # Casillas: ver es para todos. DELETE (= desactivar) exige
+        # toggle_patient_active. PUT/PATCH exige manage_patients, salvo si
+        # solo cambia isActive (reactivar): ese caso lo valida
+        # PatientSerializer.validate_is_active con toggle_patient_active.
+        method = self.request.method
+        if method == 'DELETE':
+            permissions.append(staff_permission('toggle_patient_active')())
+        elif method in ('PUT', 'PATCH') and not set(self.request.data) <= {'is_active'}:
+            permissions.append(staff_permission('manage_patients')())
         return permissions
 
     def perform_destroy(self, instance):
@@ -157,7 +163,7 @@ class PatientNoteListCreateApiView(BusinessScopedMixin, AuditLogMixin, ListCreat
     # No hay bloqueo por consentimiento todavia (RF-33 no existe en el
     # sistema); cuando exista, va aca en get_queryset/perform_create.
     serializer_class = PatientNoteSerializer
-    permission_classes = [IsAuthenticated, IsProfessional]
+    permission_classes = [IsAuthenticated, staff_permission('view_clinical_info')]
     pagination_class = None
 
     def get_queryset(self):
@@ -188,7 +194,7 @@ class PatientNoteDetailApiView(BusinessScopedMixin, AuditLogMixin, UpdateModelMi
     # ("acumulativas, no se borran"), pero hace falta para poder limpiar
     # una nota cargada por error sin dejarla para siempre en el expediente.
     serializer_class = PatientNoteSerializer
-    permission_classes = [IsAuthenticated, IsPatientNoteAuthor, IsProfessional]
+    permission_classes = [IsAuthenticated, IsPatientNoteAuthor, staff_permission('view_clinical_info')]
     def get_queryset(self):
         # La nota debe ser del paciente de la URL (antes se ignoraba
         # patient_id); el negocio lo agrega el mixin.
@@ -216,7 +222,7 @@ class PatientFileApiView(BusinessScopedMixin, AuditLogMixin, APIView):
     # acceso a una seccion sin dar acceso a la otra (por ejemplo, alguien
     # que ve la agenda pero no las notas clinicas), es este metodo el que
     # hay que tocar para armar el dict de forma condicional segun el rol.
-    permission_classes = [IsAuthenticated, IsProfessional]
+    permission_classes = [IsAuthenticated, staff_permission('view_clinical_info')]
 
     def get(self, request, patient_id):
         patient = self.get_business_object(Patient, pk=patient_id)
@@ -271,8 +277,8 @@ class PatientReassignApiView(BusinessScopedMixin, APIView):
     # CaseReassignment antes de tocar Patient.assigned_psychologist, para
     # que nunca pueda cambiar sin dejar rastro en el historial. No toca
     # citas anteriores (RF-30).
-    # Roles: reasignar es una decision de coordinacion, solo administrador.
-    permission_classes = [IsAuthenticated, IsAdministrator]
+    # Casilla: reasignar es una decision de coordinacion.
+    permission_classes = [IsAuthenticated, staff_permission('reassign_patient')]
 
     def post(self, request, patient_id):
         patient = self.get_business_object(Patient, pk=patient_id)
@@ -329,7 +335,7 @@ class PatientConsentDocumentApiView(BusinessScopedMixin, AuditLogMixin, APIView)
     # del paciente prellenados, usando la version vigente del texto
     # (is_current=True).
     audit_action = AuditLog.ActionTypes.EXPORT
-    permission_classes = [IsAuthenticated, IsProfessional]
+    permission_classes = [IsAuthenticated, staff_permission('view_clinical_info')]
 
     def get(self, request, patient_id):
         patient = self.get_business_object(Patient, pk=patient_id)
@@ -402,7 +408,7 @@ class PatientConsentUploadApiView(BusinessScopedMixin, AuditLogMixin, APIView):
     # original queda en fisico y nada se bloquea si no se carga. Queda
     # ligado a la version vigente del texto, y como hay escaneado firmado
     # se marca el check consent_signed del paciente.
-    permission_classes = [IsAuthenticated, IsProfessional]
+    permission_classes = [IsAuthenticated, staff_permission('view_clinical_info')]
     ALLOWED_CONTENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 
     def post(self, request, patient_id):
@@ -445,7 +451,7 @@ class PatientConsentFileApiView(BusinessScopedMixin, AuditLogMixin, APIView):
     # RF-33 (B-3): descarga el escaneado. Es la unica forma de obtenerlo y
     # exige usuario autenticado, asi el archivo nunca queda en un enlace
     # publico permanente.
-    permission_classes = [IsAuthenticated, IsProfessional]
+    permission_classes = [IsAuthenticated, staff_permission('view_clinical_info')]
 
     def get(self, request, patient_id, pk):
         consent = self.get_business_object(
@@ -484,7 +490,7 @@ class PatientExportApiView(BusinessScopedMixin, AuditLogMixin, APIView):
     # lo genero. Usa las mismas consultas que PatientFileApiView (RF-25) y
     # PatientDoctorApiView (RF-30).
     audit_action = AuditLog.ActionTypes.EXPORT
-    permission_classes = [IsAuthenticated, IsProfessional]
+    permission_classes = [IsAuthenticated, staff_permission('export_patient_file')]
 
     def get(self, request, patient_id):
         patient = self.get_business_object(Patient, pk=patient_id)

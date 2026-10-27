@@ -6,6 +6,7 @@ from rest_framework.status import HTTP_201_CREATED
 from rest_framework.pagination import PageNumberPagination
 
 from business.mixins import BusinessScopedMixin
+from psico_auth.permissions import staff_permission
 from express_appointment.models import ExpressAppointment
 from express_appointment.serializers import (
     ExpressAppointmentReadSerializer,
@@ -19,7 +20,7 @@ class ExpressAppointmentPagination(PageNumberPagination):
 
 class ExpressAppointmentListCreateApiView(BusinessScopedMixin, ListCreateAPIView):
     serializer_class = ExpressAppointmentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, staff_permission('manage_appointments', writes_only=True)]
     pagination_class = ExpressAppointmentPagination
 
     def get_serializer_class(self):
@@ -83,7 +84,7 @@ class ExpressAppointmentRetrieveApiView(BusinessScopedMixin, RetrieveUpdateDestr
     # Igual que AppointmentRetrieveApiView: queryset SIN filtrar por
     # is_active para poder reactivar una cita express desactivada.
     queryset = ExpressAppointment.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, staff_permission('manage_appointments', writes_only=True)]
 
     def get_serializer_class(self):
         if self.request.method in ('PUT', 'PATCH'):

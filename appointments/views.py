@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
 from business.mixins import BusinessScopedMixin
+from psico_auth.permissions import staff_permission
 from appointments.models import Appointment
 from appointments.serializers import (
     AppointmentReadSerializer,
@@ -24,7 +25,7 @@ class AppointmentPagination(PageNumberPagination):
     page_size = 10
 class AppointmentCreateApiView(BusinessScopedMixin, ListCreateAPIView):
     serializer_class = AppointmentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, staff_permission('manage_appointments', writes_only=True)]
     pagination_class = AppointmentPagination
     def get_serializer_class(self):
         if self.request.method == 'GET':
@@ -109,7 +110,7 @@ class AppointmentRetrieveApiView(BusinessScopedMixin, RetrieveUpdateDestroyAPIVi
         if self.request.method == 'PUT' or self.request.method == 'PATCH':
             return AppointmentSerializer
         return AppointmentReadSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, staff_permission('manage_appointments', writes_only=True)]
 
     def perform_destroy(self, instance):
         # RF-19: DELETE no borra la fila (se perderia el historial y las

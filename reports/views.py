@@ -16,6 +16,7 @@ from express_appointment.models import ExpressAppointment
 from activity.models import Activity
 from patient.models import Patient
 from business.mixins import BusinessScopedMixin
+from psico_auth.permissions import staff_permission
 from django.core import signing
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -88,7 +89,7 @@ def _apply_filters(queryset, params, business):
     return queryset
 
 class MonthlyReportApiView(BusinessScopedMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, staff_permission('view_reports')]
 
     def get(self, request):
         business = self.business
@@ -403,7 +404,7 @@ class ReportVerifyApiView(APIView):
             )
 
 class MonthlyStatsApiView(BusinessScopedMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, staff_permission('view_reports')]
 
     def get(self, request):
         business = self.business
@@ -472,7 +473,7 @@ class MonthlyStatsApiView(BusinessScopedMixin, APIView):
 
 
 class ScheduleStatsApiView(BusinessScopedMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, staff_permission('view_reports')]
 
     def get(self, request):
         queryset = _apply_filters(
@@ -523,7 +524,7 @@ class ScheduleStatsApiView(BusinessScopedMixin, APIView):
             'by_place': by_place,
         })
 class PsychologistPatientsApiView(BusinessScopedMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, staff_permission('view_reports')]
 
     def get(self, request):
         doctor_id= request.query_params.get('doctor_id')
@@ -542,7 +543,7 @@ class PsychologistPatientsApiView(BusinessScopedMixin, APIView):
         })
         
 class PatientDoctorsApiView(BusinessScopedMixin, APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, staff_permission('view_reports')]
 
     def get(self, request, patient_id):
         # Paciente de otro negocio -> 404, igual que en el resto de la API.

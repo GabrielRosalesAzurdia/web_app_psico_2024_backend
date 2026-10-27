@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from psico_auth.permissions import get_staff_permissions
+
 
 class ProfileSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source='profile.phone_number', required=False)
@@ -8,6 +10,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     group = serializers.SerializerMethodField(read_only=True)
     roles = serializers.SerializerMethodField(read_only=True)
     business_name = serializers.SerializerMethodField(read_only=True)
+    permissions = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = get_user_model()
@@ -22,6 +25,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'group',
             'roles',
             'business_name',
+            'permissions',
         ]
 
         extra_kwargs = {
@@ -48,6 +52,13 @@ class ProfileSerializer(serializers.ModelSerializer):
         profile = getattr(obj, 'profile', None)
         business = getattr(profile, 'business', None)
         return business.name if business else None
+
+    @staticmethod
+    def get_permissions(obj) -> list[str]:
+        # Casillas marcadas en la cuenta (o en su grupo), ej.
+        # ["view_clinical_info", "manage_appointments"]. El frontend las usa
+        # solo para mostrar u ocultar; el backend las vuelve a revisar.
+        return get_staff_permissions(obj)
 
     @staticmethod
     def update_profile(instance, data):
