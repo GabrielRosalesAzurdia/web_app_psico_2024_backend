@@ -4,10 +4,14 @@
     python manage.py crear_negocio_demo --reset  # borra el Demo y lo vuelve a crear
 
 Las fechas se calculan desde el dia en que se corre: siempre hay citas
-pasadas, de hoy y futuras. Todas las cuentas usan la contraseña DEMO_PASSWORD.
+pasadas, de hoy y futuras. Todas las cuentas usan la misma contraseña: la de
+la variable de entorno DEMO_PASSWORD o, si no existe, una al azar que se
+muestra una sola vez al crear el Demo (en Render, en el log del despliegue).
 Solo toca datos del negocio "Demo"; los demas negocios no se modifican.
 """
+import os
 import random
+import secrets
 from datetime import date, time, timedelta
 
 from django.contrib.auth import get_user_model
@@ -27,7 +31,6 @@ from profiles.models import Profile
 from psico_auth.permissions import set_staff_permissions
 
 BUSINESS_NAME = "Demo"
-DEMO_PASSWORD = "Demo2026!"
 
 PROFESSIONAL = ["view_clinical_info", "export_patient_file",
                 "manage_patients", "manage_appointments", "view_reports"]
@@ -110,9 +113,16 @@ class Command(BaseCommand):
                 f'No se creó el Demo: ya existen cuentas con {", ".join(taken)}.'))
             return
 
+        # La contraseña no va en el codigo: el repo lo ve mas gente que la
+        # que deberia poder entrar al Demo de produccion.
+        password = os.environ.get("DEMO_PASSWORD")
+        from_env = bool(password)
+        if not password:
+            password = secrets.token_urlsafe(9)
+
         rng = random.Random(2026)  # mismos datos cada vez
         business = Business.objects.create(name=BUSINESS_NAME)
-        admin, laura, marco, recepcion = self._create_staff(business)
+        admin, laura, marco, recepcion = self._create_staff(business, password)
         doctors = [laura, marco]
         patients = self._create_patients(business, admin, doctors)
         n_appts = self._create_appointments(business, patients, doctors, rng)
@@ -121,7 +131,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'Negocio "Demo" creado: {len(STAFF)} cuentas, {len(patients)} pacientes, '
             f'{n_appts} citas, {len(ACTIVITIES)} actividades.'))
-        self.stdout.write(f"Contraseña de todas las cuentas: {DEMO_PASSWORD}")
+        if from_env:
+            self.stdout.write("Contraseña de todas las cuentas: la de la variable DEMO_PASSWORD.")
+        else:
+            self.stdout.write(f"Contraseña de todas las cuentas (guárdala, no se vuelve a mostrar): {password}")
         for _, email, first, last, _, group, _ in STAFF:
             self.stdout.write(f"  {email:30} {first} {last} ({group})")
 
@@ -136,12 +149,12 @@ class Command(BaseCommand):
         business.delete()
         self.stdout.write('Negocio "Demo" anterior borrado.')
 
-    def _create_staff(self, business):
+    def _create_staff(self, business, password):
         User = get_user_model()
         accounts = []
         for username, email, first, last, phone, group, perms in STAFF:
             user = User.objects.create_user(
-                username=username, email=email, password=DEMO_PASSWORD,
+                username=username, email=email, password=password,
                 first_name=first, last_name=last)
             user.groups.add(Group.objects.get(name=group))
             if perms is not None:
