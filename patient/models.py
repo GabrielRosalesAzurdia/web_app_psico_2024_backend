@@ -126,8 +126,9 @@ class PatientNote(BusinessOwnedModel):
     # (el tablon compartido tipo post-it entre psicologos): esto es
     # contenido clinico del paciente, y cae bajo RNF-02 (solo profesional
     # autenticado, igual que el resto de la API).
-    # Acumulativas y no se sobrescriben: no hay UPDATE, solo se agregan.
-    # Por eso no hay campo "updated_at" ni endpoint de edicion.
+    # Acumulativas: no se borran de la base de datos. Desde RF-28 el autor
+    # puede editarlas (PATCH, guarda edited_by y edited_at) y anularlas
+    # (DELETE, pone is_active=False y la nota sale del listado).
     patient = models.ForeignKey(
         Patient, related_name='clinical_notes', on_delete=models.CASCADE)
     author = models.ForeignKey(

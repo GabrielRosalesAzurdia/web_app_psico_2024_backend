@@ -181,10 +181,11 @@ class PatientNoteListCreateApiView(BusinessScopedMixin, AuditLogMixin, ListCreat
 class IsPatientNoteAuthor(BasePermission):
     # Igual que IsNoteAuthor en note/views.py (RF-24): se deja que se
     # encuentre el objeto y se responda 403, en vez de filtrar el queryset
-    # (que daria 404 en una nota ajena).
-    message = 'Solo quien escribio la nota puede borrarla.'
-
+    # (que daria 404 en una nota ajena). El mensaje depende de la accion:
+    # PATCH edita la nota, DELETE la anula.
     def has_object_permission(self, request, view, obj):
+        accion = 'borrarla' if request.method == 'DELETE' else 'editarla'
+        self.message = f'Solo quien escribio la nota puede {accion}.'
         return obj.author_id == request.user.id
 
 
