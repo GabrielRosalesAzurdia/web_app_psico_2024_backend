@@ -81,6 +81,8 @@ class AppointmentSerializer(BusinessScopedSerializerMixin, serializers.ModelSeri
     class Meta:
         model = Appointment
         fields = '__all__'
+        # Solo lo marca el paciente desde su link (#144), no el personal.
+        read_only_fields = ['confirmed_at']
 
     def _current(self, data, field):
         if field in data:
@@ -119,6 +121,13 @@ class AppointmentSerializer(BusinessScopedSerializerMixin, serializers.ModelSeri
                 raise serializers.ValidationError(
                     {"hour": "El psicologo ya tiene una cita en ese horario."}
                 )
+
+        # Issue #145: si se cambia la fecha o la hora, la confirmacion del
+        # paciente era para el horario anterior: se borra para que vuelva
+        # a confirmar.
+        if self.instance and self.instance.confirmed_at and (
+                date != self.instance.date or data['hour'] != self.instance.hour):
+            data['confirmed_at'] = None
         return data
 class AppointmentReadSerializer(AppointmentSerializer):
     patient = PatientSerializer()

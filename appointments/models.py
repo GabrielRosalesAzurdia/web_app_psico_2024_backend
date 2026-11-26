@@ -92,6 +92,12 @@ class Appointment(BusinessOwnedModel):
     # psicologo elige activamente sobre una cita vigente.
     is_active = models.BooleanField(default=True)
 
+    # Issue #145: cuando el paciente confirmo la cita desde su link (#144).
+    # Es un campo aparte y no un valor mas de "status" porque status dice si
+    # asistio: una cita confirmada sigue PENDING hasta que se marca cumplida
+    # o no cumplida, y asi sigue en pendientes, recordatorios y reportes.
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
     def save(self, *args, **kwargs):
         # RNF-07: cada vez que se guarda una cita (crearla, marcar asistencia,
         # editarla o desactivarla) se recalcula la ultima atencion del
