@@ -1,10 +1,39 @@
+from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models.functions import Lower
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from appointments.schedule import TimeBlock
 from web_app_psico_2024_backend.encrypted_fields import EncryptedTextField
 from business.models import BusinessOwnedModel
+
+
+class SessionType(BusinessOwnedModel):
+    # Issue #143: tarifas de cada negocio por tipo de sesion (ej.
+    # "Individual" Q300, "Pareja" Q450). Solo el administrador del negocio
+    # las crea o cambia. No se borran: se desactivan, porque las citas
+    # viejas siguen apuntando a su tipo de sesion.
+    name = models.CharField(max_length=100)
+    price = models.DecimalField(
+        max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        constraints = [
+            # Nombre unico dentro del negocio (sin importar mayus/minus).
+            models.UniqueConstraint(
+                'business',
+                Lower('name'),
+                name='unique_session_type_name_per_business',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.name} (Q{self.price})'
+
 
 class Appointment(BusinessOwnedModel):
 

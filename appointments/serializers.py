@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from django.utils.timezone import localdate
-from appointments.models import Appointment
+from appointments.models import Appointment, SessionType
 from appointments.schedule import ScheduleError, resolve_hour
+from business.permissions import get_user_business
 from business.serializers import BusinessScopedSerializerMixin
 from patient.serializers import PatientSerializer
 
@@ -31,6 +32,29 @@ class DoctorSerializer(serializers.Serializer):
         # Si el usuario no tiene nombre cargado, cae al username para no
         # devolver una opcion con texto vacio.
         return obj.get_full_name() or obj.username
+
+
+class SessionTypeSerializer(serializers.ModelSerializer):
+    # Issue #143: tipo de sesion con su precio. El negocio lo pone la vista.
+
+    class Meta:
+        model = SessionType
+        fields = ['id', 'name', 'price', 'is_active', 'created_at']
+        read_only_fields = ['created_at']
+
+    def validate_name(self, value):
+        # Mismo criterio que el nombre del paciente: unico en el negocio,
+        # sin distinguir mayus/minus, incluidos los desactivados. Da un 400
+        # claro; el UniqueConstraint del modelo es el respaldo.
+        value = value.strip()
+        business = get_user_business(self.context['request'].user)
+        qs = SessionType.objects.filter(business=business, name__iexact=value)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'Ya existe un tipo de sesion con este nombre.')
+        return value
 
 
 class AppointmentSerializer(BusinessScopedSerializerMixin, serializers.ModelSerializer):

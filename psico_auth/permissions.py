@@ -45,6 +45,18 @@ def is_business_administrator(user):
     return user.is_superuser or has_role(user, GroupName.ADMINISTRATOR)
 
 
+class IsBusinessAdministratorOrReadOnly(BasePermission):
+    # Configuracion del negocio (ej. precios por tipo de sesion, #143):
+    # cualquier cuenta del negocio la consulta, solo el administrador del
+    # negocio (o el superusuario) la crea, cambia o desactiva.
+    message = 'Solo el administrador del negocio puede cambiar esta configuracion.'
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        return is_business_administrator(request.user)
+
+
 def has_staff_permission(user, codename):
     # True si la casilla esta marcada en la cuenta o en uno de sus grupos.
     if not user or not user.is_authenticated:

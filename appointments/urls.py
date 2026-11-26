@@ -8,6 +8,8 @@ from appointments.views import (
     DashboardTodayApiView,
     DoctorListApiView,
     AppointmentRemindersApiView,
+    SessionTypeListCreateApiView,
+    SessionTypeDetailApiView,
 )
 
 urlpatterns = [
@@ -20,6 +22,13 @@ urlpatterns = [
     path('doctors/',
          DoctorListApiView.as_view(),
          name='appointment-doctors'),
+    # Issue #143: tarifas por tipo de sesion del negocio.
+    path('session-types/',
+         SessionTypeListCreateApiView.as_view(),
+         name='session-type-list'),
+    path('session-types/<int:pk>/',
+         SessionTypeDetailApiView.as_view(),
+         name='session-type-detail'),
     path('pending/',
          AppointmentGetPendingApiView.as_view(),
          name='appointment-pending'),

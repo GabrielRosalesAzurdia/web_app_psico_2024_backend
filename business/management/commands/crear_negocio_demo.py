@@ -20,7 +20,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from activity.models import Activity
-from appointments.models import Appointment
+from appointments.models import Appointment, SessionType
 from audit.models import AuditLog
 from business.models import Business
 from express_appointment.models import ExpressAppointment
@@ -124,6 +124,7 @@ class Command(BaseCommand):
         business = Business.objects.create(name=BUSINESS_NAME)
         admin, laura, marco, recepcion = self._create_staff(business, password)
         doctors = [laura, marco]
+        self._create_session_types(business)
         patients = self._create_patients(business, admin, doctors)
         n_appts = self._create_appointments(business, patients, doctors, rng)
         self._create_extras(business, admin, laura, marco, recepcion, patients, doctors, rng)
@@ -142,7 +143,7 @@ class Command(BaseCommand):
         # Orden por los PROTECT: primero lo que apunta a pacientes.
         users = get_user_model().objects.filter(profile__business=business)
         for model in (AuditLog, PatientConsent, CaseReassignment, PatientNote,
-                      ExpressAppointment, Appointment, Activity, Note,
+                      ExpressAppointment, Appointment, SessionType, Activity, Note,
                       Patient, ConsentTextVersion):
             model.objects.filter(business=business).delete()
         users.delete()
@@ -164,6 +165,11 @@ class Command(BaseCommand):
                 business=business, phone_number=phone, completed=True)
             accounts.append(user)
         return accounts
+
+    def _create_session_types(self, business):
+        # Issue #143: tarifas de ejemplo.
+        SessionType.objects.create(business=business, name="Individual", price=300)
+        SessionType.objects.create(business=business, name="Pareja", price=450)
 
     def _create_patients(self, business, admin, doctors):
         patients = []

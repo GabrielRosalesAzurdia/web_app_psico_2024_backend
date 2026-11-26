@@ -3,12 +3,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
 from business.mixins import BusinessScopedMixin
-from psico_auth.permissions import staff_permission
-from appointments.models import Appointment
+from psico_auth.permissions import IsBusinessAdministratorOrReadOnly, staff_permission
+from appointments.models import Appointment, SessionType
 from appointments.serializers import (
     AppointmentReadSerializer,
     AppointmentSerializer,
     DoctorSerializer,
+    SessionTypeSerializer,
 )
 from django.utils.timezone import localdate
 from rest_framework.response import Response
@@ -305,3 +306,31 @@ class AppointmentRemindersApiView(BusinessScopedMixin, ListAPIView):
                 proximas.append(cita.pk)
 
         return candidatas.filter(pk__in=proximas)
+
+class SessionTypeListCreateApiView(BusinessScopedMixin, ListCreateAPIView):
+    # Issue #143: GET  /api/v1/appointment/session-types/ -> tarifas del negocio
+    #             POST /api/v1/appointment/session-types/ -> nueva (solo admin)
+    # Por defecto solo las activas (las que se ofrecen al agendar);
+    # ?includeInactive=true tambien trae las desactivadas (pantalla del admin).
+    serializer_class = SessionTypeSerializer
+    permission_classes = [IsAuthenticated, IsBusinessAdministratorOrReadOnly]
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = SessionType.objects.all()
+        if self.request.query_params.get('include_inactive') != 'true':
+            queryset = queryset.filter(is_active=True)
+        return queryset
+
+
+class SessionTypeDetailApiView(BusinessScopedMixin, RetrieveUpdateDestroyAPIView):
+    # Issue #143: GET / PATCH / DELETE /api/v1/appointment/session-types/<pk>/
+    # Un tipo de otro negocio da 404 (lo filtra el mixin). DELETE no borra
+    # la fila, solo la desactiva: las citas viejas siguen apuntando a ella.
+    serializer_class = SessionTypeSerializer
+    permission_classes = [IsAuthenticated, IsBusinessAdministratorOrReadOnly]
+    queryset = SessionType.objects.all()
+
+    def perform_destroy(self, instance):
+        instance.is_active = False
+        instance.save()
