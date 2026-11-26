@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     'activity.apps.ActivityConfig',
     'note.apps.NoteConfig',
     'audit.apps.AuditConfig',
+    'notifications.apps.NotificationsConfig',
     'reports',
 
     'django.contrib.sites',
